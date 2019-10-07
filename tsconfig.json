@@ -1,0 +1,23 @@
+{
+	"compilerOptions": {
+		"baseUrl": ".",
+		"moduleResolution": "node",
+		"module": "commonjs",
+		"target": "es2017",
+		"lib": [
+			"esnext"
+		],
+		"emitDecoratorMetadata": true,
+		"experimentalDecorators": true,
+		"importHelpers": true
+	},
+	"include": [
+		"**/*.ts"
+	],
+	"exclude": [
+		"dist",
+		"bazel-*",
+		"node_modules",
+		"**/*.spec.ts"
+	]
+}

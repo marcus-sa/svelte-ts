@@ -1,0 +1,26 @@
+{
+	"name": "@avantci/bazel-svelte",
+	"dependencies": {
+		"tsickle": "0.37.0",
+		"tslib": "1.10.0"
+	},
+	"peerDependencies": {
+		"svelte": "^3.12.1",
+		"@bazel/typescript": "^0.38.1",
+		"sapper": "^0.27.9",
+		"typescript": "^3.6.3"
+	},
+	"devDependencies": {
+		"rollup": "^1.23.1",
+		"rollup-plugin-node-resolve": "^5.2.0",
+		"rollup-plugin-svelte": "^5.1.0",
+		"sapper": "0.27.9",
+		"svelte": "3.12.1",
+		"typescript": "3.6.3",
+		"@bazel/bazel": "0.29.0",
+		"@bazel/buildifier": "0.29.0",
+		"@bazel/hide-bazel-files": "0.38.0",
+		"@bazel/typescript": "0.37.0",
+		"@types/node": "12.7.7"
+	}
+}
