@@ -63,3 +63,5 @@ typings/
 .idea
 
 /bazel-*
+
+test/bundle.js
