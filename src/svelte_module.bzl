@@ -20,7 +20,7 @@ load(
     "TsConfigInfo",
 )
 
-DEFAULT_SVELTE_COMPILER = "@npm//@avantci/bazel-svelte/bin:svelte-compiler-wrapped"
+DEFAULT_SVELTE_COMPILER = "@npm//bazel-svelte/bin/compiler"
 
 # Extra options passed to Node when running ngc.
 _EXTRA_NODE_OPTIONS_FLAGS = [
