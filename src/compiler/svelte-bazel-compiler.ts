@@ -1,6 +1,5 @@
 // Inspired by https://github.com/angular/angular/blob/0119f46daf8f1efda00f723c5e329b0c8566fe07/packages/bazel/src/ngc-wrapped/index.ts
 
-//import { checkModuleDeps, Plugin as StrictDepsPlugin } from '@bazel/typescript/internal/tsc_wrapped/strict_deps';
 import { Warning } from 'svelte/types/compiler/interfaces';
 import { formatDiagnostics } from '@angular/compiler-cli';
 import * as ts from 'typescript';
@@ -16,19 +15,21 @@ import {
   debug,
   FileCache,
   FileLoader,
+  log,
   parseTsconfig,
-  runAsWorker,
-  runWorkerLoop,
 } from '@bazel/typescript';
 
 import { SvelteCompilerOptions } from './svelte-compiler-options.interface';
 import {
+  SVELTE_COMPONENT_IDENTIFIER,
   createSvelteComponentImport,
   functionDeclarationToMethodDeclaration,
-  SVELTE_COMPONENT_IDENTIFIER,
   variableStatementToPropertyDeclaration,
 } from './ast-helpers';
 import {
+  SCRIPT_TAG,
+  SVELTE_JS_EXT,
+  MISSING_DECLARATION,
   BAZEL_BIN,
   createFileLoader,
   gatherDiagnosticsForInputsOnly,
@@ -37,10 +38,7 @@ import {
   isSvelteDeclarationFile,
   isSvelteInputFile,
   isSvelteOutputFile,
-  MISSING_DECLARATION,
   relativeToRootDirs,
-  SCRIPT_TAG,
-  SVELTE_JS_EXT,
 } from './utils';
 
 export const defaultCompilerOptions: ts.CompilerOptions = {
@@ -53,20 +51,6 @@ export const defaultCompilerOptions: ts.CompilerOptions = {
   allowNonTsExtensions: true,
   removeComments: true,
 };
-
-export function main(args: string[]): number {
-  if (runAsWorker(args)) {
-    runWorkerLoop((args, inputs) => {
-      const svelteBazelCompiler = new SvelteBazelCompiler(args, inputs);
-      return svelteBazelCompiler.compile();
-    });
-  } else {
-    const svelteBazelCompiler = new SvelteBazelCompiler(args);
-    return svelteBazelCompiler.compile() ? 1 : 0;
-  }
-
-  return 0;
-}
 
 export class SvelteBazelCompiler {
   /** The one FileCache instance used in this process. */
@@ -155,7 +139,7 @@ export class SvelteBazelCompiler {
         }
 
         // console.log(`You can suppress this warning by putting "${warning.code}" into your Svelte compiler options`);
-        console.log(warning.toString());
+        log(warning.toString());
       }
     });
   }
@@ -399,10 +383,6 @@ export class SvelteBazelCompiler {
       console.error(formatDiagnostics(allDiagnostics));
     }
 
-    return hasDiagnosticsErrors(allDiagnostics);
+    return !hasDiagnosticsErrors(allDiagnostics);
   }
-}
-
-if (require.main === module) {
-  process.exitCode = main(process.argv.slice(2));
 }

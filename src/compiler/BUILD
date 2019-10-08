@@ -20,7 +20,7 @@ nodejs_binary(
     name = "compiler",
     configuration_env_vars = ["compile"],
     data = [":compiler_lib"],
-    entry_point = ":svelte-bazel-compiler.ts",
+    entry_point = ":main.ts",
     visibility = ["//visibility:public"],
 )
 

@@ -47,16 +47,6 @@ def _svelte_tsconfig(ctx, files, srcs, **kwargs):
 
     return dict(tsc_wrapped_tsconfig(ctx, files, srcs, **kwargs), **{
         "svelteCompilerOptions": svelte_compiler_options,
-        #        "compilerOptions": {
-        #            "target": "es2015",
-        #            "module": "esnext",
-        #            "moduleResolution": "node",
-        #            "alwaysStrict": False,
-        #            "inlineSourceMap": False,
-        #            "sourceMap": True,
-        #            "allowNonTsExtensions": True,
-        #            "allowJs": True,
-        #        }
     })
 
 def _expected_outs(ctx):
@@ -151,12 +141,12 @@ def svelte_compile_action(ctx, inputs, outputs, tsconfig_file, node_opts, compil
 
     arguments = (list(_EXTRA_NODE_OPTIONS_FLAGS) + ["--node_options=%s" % opt for opt in node_opts])
 
-    #    supports_workers = str(int(ctx.attr._supports_workers))
-    #
-    #    if supports_workers == "1":
-    #        arguments += ["@@" + tsconfig_file.path]
-    #    else:
-    arguments += ["-p", tsconfig_file.path]
+    supports_workers = str(int(ctx.attr.supports_workers))
+
+    if supports_workers == "1":
+        arguments += ["@@" + tsconfig_file.path]
+    else:
+        arguments += ["-p", tsconfig_file.path]
 
     ctx.actions.run(
         progress_message = progress_message,
@@ -165,9 +155,9 @@ def svelte_compile_action(ctx, inputs, outputs, tsconfig_file, node_opts, compil
         outputs = outputs,
         arguments = arguments,
         executable = ctx.executable.compiler,
-        #        execution_requirements = {
-        #            "supports-workers": supports_workers,
-        #        },
+        execution_requirements = {
+            "supports-workers": supports_workers,
+        },
     )
 
     return struct(
@@ -216,7 +206,7 @@ SVELTE_MODULE_ATTRS = dict(COMMON_ATTRIBUTES, **{
         executable = True,
         cfg = "host",
     ),
-    "_supports_workers": attr.bool(default = True),
+    "supports_workers": attr.bool(default = True),
 })
 
 svelte_module = rule(
