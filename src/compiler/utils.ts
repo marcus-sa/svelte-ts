@@ -12,6 +12,7 @@ export const BAZEL_BIN = /\b(blaze|bazel)-out\b.*?\bbin\b/;
 export const SVELTE_JS_EXT = /(.svelte.js)$/g;
 export const SVELTE_DTS_EXT = /(.svelte.d.ts)$/;
 export const SCRIPT_TAG = /<script(\s[^]*?)?>([^]*?)<\/script>/gi;
+export const STYLE_TAG = /<style(\s[^]*?)?>([^]*?)<\/style>/gi;
 export const SVELTE_FILE_COMPONENT_NAME = /(.*?).svelte.(d.ts|js)$/;
 export const MISSING_DECLARATION = /'(.*?)'/;
 
@@ -29,6 +30,10 @@ export function isSvelteInputFile(fileName: string): boolean {
 
 export function getSvelteNameFromPath(fileName: string): string {
   return path.basename(fileName).match(SVELTE_FILE_COMPONENT_NAME)[1];
+}
+
+export function getTemplateFromSource(source: string): string {
+  return source.replace(SCRIPT_TAG, '').replace(STYLE_TAG, '');
 }
 
 export function createFileLoader(

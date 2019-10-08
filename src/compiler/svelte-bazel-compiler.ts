@@ -1,10 +1,10 @@
 // Inspired by https://github.com/angular/angular/blob/0119f46daf8f1efda00f723c5e329b0c8566fe07/packages/bazel/src/ngc-wrapped/index.ts
 
-import { Warning } from 'svelte/types/compiler/interfaces';
+import { Ast, Warning } from 'svelte/types/compiler/interfaces';
 import { formatDiagnostics } from '@angular/compiler-cli';
 import * as ts from 'typescript';
 import { ModifierFlags, SyntaxKind } from 'typescript';
-import { compile } from 'svelte/compiler';
+import { compile, parse } from 'svelte/compiler';
 import * as fs from 'fs';
 import * as tsickle from 'tsickle';
 import * as path from 'path';
@@ -21,11 +21,12 @@ import {
 
 import { SvelteCompilerOptions } from './svelte-compiler-options.interface';
 import {
-  SVELTE_COMPONENT_IDENTIFIER,
   createSvelteComponentImport,
   functionDeclarationToMethodDeclaration,
   variableStatementToPropertyDeclaration,
   getSvelteComponentIdentifier,
+  getAllComponentNames,
+  getAllImports,
 } from './ast-helpers';
 import {
   SCRIPT_TAG,
@@ -40,6 +41,7 @@ import {
   isSvelteInputFile,
   isSvelteOutputFile,
   relativeToRootDirs,
+  getTemplateFromSource,
 } from './utils';
 
 export const defaultCompilerOptions: ts.CompilerOptions = {
@@ -129,7 +131,7 @@ export class SvelteBazelCompiler {
     );
   }
 
-  private handleSvelteCompilationWarnings(warnings: Warning[]) {
+  private handleSvelteCompilationWarnings(ast: Ast, warnings: Warning[]) {
     warnings.forEach(warning => {
       if (!this.options.suppressWarnings.includes(warning.code)) {
         if (warning.code === 'missing-declaration') {
@@ -150,11 +152,35 @@ export class SvelteBazelCompiler {
     target: ts.ScriptTarget,
   ): ts.SourceFile {
     const content = this.bazelHost.readFile(fileName);
+    const template = getTemplateFromSource(content);
+    const { html: ast } = parse(template, {
+      filename: fileName,
+    });
 
     let source = '';
     content.replace(SCRIPT_TAG, (_, __, code) => (source = code));
 
-    return ts.createSourceFile(fileName, source, target);
+    const sourceFile = ts.createSourceFile(fileName, source, target);
+
+    // TODO: Validate against AST
+    const inlineComponentNames = getAllComponentNames(ast);
+
+    if (inlineComponentNames.length) {
+      log(
+        getAllImports(sourceFile).map(node => {
+          if ('namedBindings' in node) {
+            if (ts.isNamedImports(node.namedBindings)) {
+              log(node.namedBindings.elements);
+              // node.namedBindings[x].name.escapedText;
+            }
+          } else if ('name' in node) {
+            return node.name.escapedText;
+          }
+        }),
+      );
+    }
+
+    return sourceFile;
   }
 
   private createSvelteComponentDeclarationSource(
@@ -233,12 +259,12 @@ export class SvelteBazelCompiler {
     delete options.expectedOuts;
     delete options.suppressWarnings;
 
-    const { js, warnings } = compile(script, {
+    const { js, warnings, ast } = compile(script, {
       filename: relativeSourceFilePath,
       ...options,
     });
 
-    this.handleSvelteCompilationWarnings(warnings);
+    this.handleSvelteCompilationWarnings(ast, warnings);
 
     return js.code;
   }

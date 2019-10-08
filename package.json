@@ -17,12 +17,17 @@
       "yarn bazel:buildify",
       "git add"
     ],
-    "*.{ts,js}": [
+    "*.{svelte}": [
+      "prettier --write --parser=html",
+      "git add"
+    ],
+    "*.{ts,js,html}": [
       "prettier --write",
       "git add"
     ]
   },
   "dependencies": {
+    "@angular/compiler-cli": "8.2.9",
     "tsickle": "0.37.0",
     "tslib": "1.10.0"
   },
@@ -45,7 +50,6 @@
     "prettier": "1.18.2",
     "sapper": "0.27.9",
     "svelte": "3.12.1",
-    "typescript": "3.6.3",
-    "webpack": "^4.41.0"
+    "typescript": "3.6.3"
   }
 }

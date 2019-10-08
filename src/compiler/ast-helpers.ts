@@ -1,3 +1,4 @@
+import { Ast } from 'svelte/types/compiler/interfaces';
 import * as ts from 'typescript';
 
 export const SVELTE_COMPONENT_IDENTIFIER = ts.createIdentifier(
@@ -67,4 +68,46 @@ export function variableStatementToPropertyDeclaration(
     checker.typeToTypeNode(type),
     undefined, //initializer,
   );
+}
+
+export function collectDeepNodes<T extends ts.Node>(
+  node: ts.Node,
+  kind: ts.SyntaxKind | ts.SyntaxKind[],
+): T[] {
+  const kinds = Array.isArray(kind) ? kind : [kind];
+  const nodes: T[] = [];
+
+  const helper = (child: ts.Node) => {
+    if (kinds.includes(child.kind)) {
+      nodes.push(child as T);
+    }
+
+    ts.forEachChild(child, helper);
+  };
+
+  ts.forEachChild(node, helper);
+
+  return nodes;
+}
+
+export function getAllImports(sourceFile: ts.SourceFile) {
+  return collectDeepNodes<ts.ImportClause>(
+    sourceFile,
+    // ts.SyntaxKind.ImportDeclaration,
+    ts.SyntaxKind.ImportClause,
+  );
+}
+
+export function getAllComponentNames(node: Ast['html']): string[] {
+  const components: string[] = [];
+
+  if (node.type === 'InlineComponent') {
+    components.push(node.name);
+  }
+
+  (node.children || []).forEach(child => {
+    components.push(...getAllComponentNames(child));
+  });
+
+  return components;
 }

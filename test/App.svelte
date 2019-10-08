@@ -1,7 +1,9 @@
 <script lang="typescript">
-  import Button from './Button';
+  import { Button } from './Button';
 
   export const hello: string = 'Hello world';
+
+  let icon = 'user';
 </script>
 
 <style lang="scss">
@@ -10,11 +12,11 @@
   }
 
   :global(body) {
-		/* this will apply to <body> */
-		margin: 0;
+    /* this will apply to <body> */
+    margin: 0;
   }
 </style>
 
-<Button>
+<button lol="{icon}">
   { hello }
-</Button>
+</button>
