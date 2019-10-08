@@ -101,6 +101,11 @@
   resolved "https://registry.yarnpkg.com/@bazel/hide-bazel-files/-/hide-bazel-files-0.38.1.tgz#a2447e04775de262290adf3afa533d4472a75641"
   integrity sha512-9psDbiOS53tdHSpVVhxf01aBHjdOOwljAkJdleuAPhGif/jl2GrAfVXcSSgmMogeTlDT1xMG24sryPxn7M/3Zw==
 
+"@bazel/ibazel@0.10.3":
+  version "0.10.3"
+  resolved "https://registry.yarnpkg.com/@bazel/ibazel/-/ibazel-0.10.3.tgz#2e2b8a1d3e885946eac41db2b1aa6801fb319887"
+  integrity sha512-v1nXbMTHVlMM4z4uWp6XiRoHAyUlYggF1SOboLLWRp0+D22kWixqArWqnozLw2mOtnxr97BdLjluWiho6A8Hjg==
+
 "@bazel/typescript@0.37.0":
   version "0.37.0"
   resolved "https://registry.yarnpkg.com/@bazel/typescript/-/typescript-0.37.0.tgz#9213d963cf132db614a9780b87815cda256a3e14"

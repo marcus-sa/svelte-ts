@@ -1,5 +1,5 @@
 <script lang="typescript">
-  import { Button } from './Button';
+  import { Button } from './Button/#index';
 
   export const hello: string = 'Hello world';
 

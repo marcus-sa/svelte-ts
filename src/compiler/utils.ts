@@ -6,6 +6,7 @@ import {
   FileLoader,
   resolveNormalizedPath,
   UncachedFileLoader,
+  CompilerHost,
 } from '@bazel/typescript';
 
 export const BAZEL_BIN = /\b(blaze|bazel)-out\b.*?\bbin\b/;
@@ -77,36 +78,4 @@ export function hasDiagnosticsErrors(
   diagnostics: ReadonlyArray<ts.Diagnostic>,
 ) {
   return diagnostics.some(d => d.category === ts.DiagnosticCategory.Error);
-}
-
-export function gatherDiagnosticsForInputsOnly(
-  program: ts.Program,
-): ts.Diagnostic[] {
-  const diagnostics: ts.Diagnostic[] = [];
-  // These checks mirror ts.getPreEmitDiagnostics, with the important
-  // exception of avoiding b/30708240, which is that if you call
-  // program.getDeclarationDiagnostics() it somehow corrupts the emit.
-  /*const strictDeps = new StrictDepsPlugin(program, {
-    rootDir: this.compilerOpts.rootDir,
-    allowedStrictDeps: this.bazelOpts.allowedStrictDeps,
-    compilationTargetSrc: this.bazelOpts.compilationTargetSrc,
-  });*/
-
-  diagnostics.push(...program.getOptionsDiagnostics());
-  diagnostics.push(...program.getGlobalDiagnostics());
-  const programFiles = program
-    .getSourceFiles()
-    .filter(sf => isSvelteInputFile(sf.fileName));
-
-  return programFiles.reduce(
-    (allDiagnostics, sf) => [
-      //diagnostics.push(...strictDeps.getDiagnostics(sf));
-      // Note: We only get the diagnostics for individual files
-      // to e.g. not check libraries.
-      ...allDiagnostics,
-      ...program.getSyntacticDiagnostics(sf),
-      ...program.getSemanticDiagnostics(sf),
-    ],
-    diagnostics,
-  );
 }

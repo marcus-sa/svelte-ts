@@ -44,6 +44,7 @@
     "@bazel/buildifier": "0.29.0",
     "@bazel/hide-bazel-files": "0.38.0",
     "@bazel/typescript": "0.37.0",
+    "@bazel/ibazel": "0.10.3",
     "@types/node": "12.7.7",
     "husky": "3.0.8",
     "lint-staged": "9.4.1",

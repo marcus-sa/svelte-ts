@@ -1,5 +1,15 @@
-import { Ast } from 'svelte/types/compiler/interfaces';
+import { Node as SvelteNode } from 'svelte/types/compiler/interfaces';
 import * as ts from 'typescript';
+
+export type SvelteComponentNode = SvelteNode & {
+  type: 'InlineComponent';
+};
+
+export function isSvelteComponentNode(
+  node: SvelteNode,
+): node is SvelteComponentNode {
+  return node.type === 'InlineComponent';
+}
 
 export const SVELTE_COMPONENT_IDENTIFIER = ts.createIdentifier(
   'SvelteComponent',
@@ -90,23 +100,31 @@ export function collectDeepNodes<T extends ts.Node>(
   return nodes;
 }
 
-export function getAllImports(sourceFile: ts.SourceFile) {
-  return collectDeepNodes<ts.ImportClause>(
+export function getAllExports(sourceFile: ts.SourceFile) {
+  return collectDeepNodes<ts.ExportDeclaration>(
     sourceFile,
-    // ts.SyntaxKind.ImportDeclaration,
-    ts.SyntaxKind.ImportClause,
+    ts.SyntaxKind.ExportDeclaration,
   );
 }
 
-export function getAllComponentNames(node: Ast['html']): string[] {
-  const components: string[] = [];
+export function getAllImports(sourceFile: ts.SourceFile) {
+  return collectDeepNodes<ts.ImportDeclaration>(
+    sourceFile,
+    ts.SyntaxKind.ImportDeclaration,
+  );
+}
 
-  if (node.type === 'InlineComponent') {
-    components.push(node.name);
+export function getSvelteComponentNodes(
+  node: SvelteNode,
+): SvelteComponentNode[] {
+  const components: SvelteComponentNode[] = [];
+
+  if (isSvelteComponentNode(node)) {
+    components.push(node);
   }
 
   (node.children || []).forEach(child => {
-    components.push(...getAllComponentNames(child));
+    components.push(...getSvelteComponentNodes(child));
   });
 
   return components;
