@@ -35,27 +35,28 @@ _EXTRA_NODE_OPTIONS_FLAGS = [
 def _svelte_tsconfig(ctx, files, srcs, **kwargs):
     outs = _expected_outs(ctx)
     if "devmode_manifest" in kwargs:
-       expected_outs = outs.devmode_js + outs.declarations
+        expected_outs = outs.devmode_js + outs.declarations
     else:
-       expected_outs = outs.closure_js
+        expected_outs = outs.closure_js
 
     svelte_compiler_options = {
         "expectedOuts": depset([o.path for o in expected_outs]).to_list(),
         "format": "esm",
+        "accessors": True,
     }
 
     return dict(tsc_wrapped_tsconfig(ctx, files, srcs, **kwargs), **{
         "svelteCompilerOptions": svelte_compiler_options,
-#        "compilerOptions": {
-#            "target": "es2015",
-#            "module": "esnext",
-#            "moduleResolution": "node",
-#            "alwaysStrict": False,
-#            "inlineSourceMap": False,
-#            "sourceMap": True,
-#            "allowNonTsExtensions": True,
-#            "allowJs": True,
-#        }
+        #        "compilerOptions": {
+        #            "target": "es2015",
+        #            "module": "esnext",
+        #            "moduleResolution": "node",
+        #            "alwaysStrict": False,
+        #            "inlineSourceMap": False,
+        #            "sourceMap": True,
+        #            "allowNonTsExtensions": True,
+        #            "allowJs": True,
+        #        }
     })
 
 def _expected_outs(ctx):
@@ -102,6 +103,7 @@ def _filter_ts_inputs(all_inputs):
 
 def _prodmode_compile_action(ctx, inputs, outputs, tsconfig_file, node_opts):
     outs = _expected_outs(ctx)
+
     # compile_action_outputs = outputs + outs.devmode_js + outs.declarations
     return _compile_action(ctx, inputs, outputs + outs.closure_js, tsconfig_file, node_opts, "prod")
 
@@ -149,11 +151,11 @@ def svelte_compile_action(ctx, inputs, outputs, tsconfig_file, node_opts, compil
 
     arguments = (list(_EXTRA_NODE_OPTIONS_FLAGS) + ["--node_options=%s" % opt for opt in node_opts])
 
-#    supports_workers = str(int(ctx.attr._supports_workers))
-#
-#    if supports_workers == "1":
-#        arguments += ["@@" + tsconfig_file.path]
-#    else:
+    #    supports_workers = str(int(ctx.attr._supports_workers))
+    #
+    #    if supports_workers == "1":
+    #        arguments += ["@@" + tsconfig_file.path]
+    #    else:
     arguments += ["-p", tsconfig_file.path]
 
     ctx.actions.run(
@@ -163,9 +165,9 @@ def svelte_compile_action(ctx, inputs, outputs, tsconfig_file, node_opts, compil
         outputs = outputs,
         arguments = arguments,
         executable = ctx.executable.compiler,
-#        execution_requirements = {
-#            "supports-workers": supports_workers,
-#        },
+        #        execution_requirements = {
+        #            "supports-workers": supports_workers,
+        #        },
     )
 
     return struct(
