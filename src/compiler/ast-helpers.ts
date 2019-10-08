@@ -4,9 +4,21 @@ export const SVELTE_COMPONENT_IDENTIFIER = ts.createIdentifier(
   'SvelteComponent',
 );
 
-export function createSvelteComponentImport(): ts.ImportDeclaration {
+export const SVELTE_COMPONENT_DEV_IDENTIFIER = ts.createIdentifier(
+  'SvelteComponentDev',
+);
+
+export function getSvelteComponentIdentifier(devMode = true): ts.Identifier {
+  return devMode
+    ? SVELTE_COMPONENT_DEV_IDENTIFIER
+    : SVELTE_COMPONENT_IDENTIFIER;
+}
+
+export function createSvelteComponentImport(
+  devMode: boolean,
+): ts.ImportDeclaration {
   const namedImports = ts.createNamedImports([
-    ts.createImportSpecifier(undefined, SVELTE_COMPONENT_IDENTIFIER),
+    ts.createImportSpecifier(undefined, getSvelteComponentIdentifier(devMode)),
   ]);
 
   const importClause = ts.createImportClause(undefined, namedImports);

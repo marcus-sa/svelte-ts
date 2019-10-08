@@ -25,6 +25,7 @@ import {
   createSvelteComponentImport,
   functionDeclarationToMethodDeclaration,
   variableStatementToPropertyDeclaration,
+  getSvelteComponentIdentifier,
 } from './ast-helpers';
 import {
   SCRIPT_TAG,
@@ -180,12 +181,12 @@ export class SvelteBazelCompiler {
       }
     });
 
-    const svelteComponentImport = createSvelteComponentImport();
+    const svelteComponentImport = createSvelteComponentImport(this.options.dev);
     const componentName = getSvelteNameFromPath(fileName);
 
     const type = ts.createExpressionWithTypeArguments(
       undefined,
-      SVELTE_COMPONENT_IDENTIFIER,
+      getSvelteComponentIdentifier(this.options.dev),
     );
 
     const heritageClause = ts.createHeritageClause(SyntaxKind.ExtendsKeyword, [

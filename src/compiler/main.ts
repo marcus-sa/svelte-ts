@@ -1,4 +1,4 @@
-import { log, runAsWorker, runWorkerLoop } from '@bazel/typescript';
+import { runAsWorker, runWorkerLoop } from '@bazel/typescript';
 
 import { SvelteBazelCompiler } from './svelte-bazel-compiler';
 
