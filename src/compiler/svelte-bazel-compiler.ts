@@ -42,6 +42,7 @@ import {
   relativeToRootDirs,
   SVELTE_FILE_COMPONENT_NAME,
 } from './utils';
+import { type } from 'os';
 
 export type SvelteCompilation = ReturnType<typeof compile>;
 
@@ -147,77 +148,6 @@ export class SvelteBazelCompiler {
         log(warning.toString());
       }
     });
-  }
-
-  private resolveSvelteComponentImports(
-    sourceFile: ts.SourceFile,
-    componentNodes: SvelteComponentNode[],
-  ) {
-    const hasComponentNode = (
-      node: ts.ImportClause | ts.ImportSpecifier,
-    ): boolean =>
-      componentNodes.some(({ name }) => name === node.name.escapedText);
-
-    const something = [];
-
-    if (componentNodes.length) {
-      const allImports = getAllImports(sourceFile);
-      const componentImports = new Set<
-        [ts.ImportClause | ts.ImportSpecifier, ts.StringLiteral]
-      >();
-
-      // : ts.NodeArray<ImportSpecifier> | ts.ImportClause[]
-      // TODO: Some weird error where Array.prototype.flatMap doesn't exist
-
-      for (const { importClause, moduleSpecifier } of allImports) {
-        if (ts.isNamedImports(importClause.namedBindings)) {
-          for (const node of importClause.namedBindings.elements) {
-            // there can be either propertyName or name which reflects the real name of the import
-            // if it is a named import, it'll have a "propertyName", otherwise the real import will be "name"
-            if (hasComponentNode(node)) {
-              componentImports.add([node, moduleSpecifier as ts.StringLiteral]);
-            }
-          }
-        } else if (hasComponentNode(importClause)) {
-          componentImports.add([
-            importClause,
-            moduleSpecifier as ts.StringLiteral,
-          ]);
-        }
-      }
-
-      for (const [node, { text: moduleName }] of componentImports.values()) {
-        const nodeText = node.name.escapedText as string;
-
-        // @ts-ignore
-        const moduleId = this.bazelHost.fileNameToModuleId(sourceFile.fileName);
-        const containingFile = path.join(this.bazelBin, moduleId);
-        const { resolvedModule } = ts.resolveModuleName(
-          moduleName,
-          containingFile,
-          this.compilerOpts,
-          this.bazelHost,
-        );
-
-        if (resolvedModule) {
-          const sourceFile = this.bazelHost.getSourceFile(
-            resolvedModule.resolvedFileName,
-            this.compilerOpts.target,
-          );
-          log(
-            collectDeepNodes<ts.Identifier>(
-              sourceFile,
-              ts.SyntaxKind.Identifier,
-            ).filter(id => id.escapedText === nodeText),
-          );
-          something.push(
-            ...this.resolveSvelteComponentImports(sourceFile, componentNodes),
-          );
-        }
-      }
-    }
-
-    return something;
   }
 
   private createSvelteSourceFile(
@@ -416,13 +346,85 @@ export class SvelteBazelCompiler {
     sourceFile: ts.SourceFile,
   ): ts.Diagnostic[] {
     const compilation = this.svelteTemplateCache.get(sourceFile.fileName);
+    const diagnostics: ts.Diagnostic[] = [];
+
     if (compilation) {
       const componentNodes = getSvelteComponentNodes(compilation.ast.html);
 
-      this.resolveSvelteComponentImports(sourceFile, componentNodes);
+      const hasComponentNode = (
+        node: ts.ImportClause | ts.ImportSpecifier,
+      ): boolean =>
+        componentNodes.some(({ name }) => name === node.name.escapedText);
+
+      const getComponentNode = () => (
+        node: ts.ImportClause | ts.ImportSpecifier,
+      ): SvelteComponentNode =>
+        componentNodes.find(({ name }) => name === node.name.escapedText);
+
+      const something = [];
+
+      const typeChecker = this.program.getTypeChecker();
+
+      if (componentNodes.length) {
+        const allImports = getAllImports(sourceFile);
+        const componentImports = new Set<
+          [ts.ImportClause | ts.ImportSpecifier, ts.StringLiteral]
+        >();
+
+        // : ts.NodeArray<ImportSpecifier> | ts.ImportClause[]
+        // TODO: Some weird error where Array.prototype.flatMap doesn't exist
+
+        for (const { importClause, moduleSpecifier } of allImports) {
+          if (ts.isNamedImports(importClause.namedBindings)) {
+            for (const specifier of importClause.namedBindings.elements) {
+              // there can be either propertyName or name which reflects the real name of the import
+              // if it is a named import, it'll have a "propertyName", otherwise the real import will be "name"
+              if (hasComponentNode(specifier)) {
+                componentImports.add([
+                  specifier,
+                  moduleSpecifier as ts.StringLiteral,
+                ]);
+              }
+            }
+          } else if (hasComponentNode(importClause)) {
+            componentImports.add([
+              importClause,
+              moduleSpecifier as ts.StringLiteral,
+            ]);
+          }
+        }
+
+        for (const [
+          identifier,
+          { text: moduleName },
+        ] of componentImports.values()) {
+          // TODO: Type check if import is a class which extends SvelteComponent/SvelteComponentDev
+          // TODO: Type check methods
+          // TODO: Type check props
+          log(typeChecker.getTypeAtLocation(identifier));
+
+          const moduleId = this.bazelHost.fileNameToModuleId(
+            sourceFile.fileName,
+          );
+          const containingFile = path.join(this.bazelBin, moduleId);
+          const { resolvedModule } = ts.resolveModuleName(
+            moduleName,
+            containingFile,
+            this.compilerOpts,
+            this.bazelHost,
+          );
+
+          /*if (resolvedModule) {
+            const sourceFile = this.bazelHost.getSourceFile(
+              resolvedModule.resolvedFileName,
+              this.compilerOpts.target,
+            );
+          }*/
+        }
+      }
     }
 
-    return [];
+    return diagnostics;
   }
 
   private gatherDiagnosticsForInputsOnly(): ts.Diagnostic[] {
