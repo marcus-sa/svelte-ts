@@ -4,7 +4,7 @@ import InlineComponent from 'svelte/types/compiler/compile/nodes/InlineComponent
 import * as bazel from '@bazel/typescript';
 import { log } from '@bazel/typescript';
 
-import { SvelteTemplateCache } from './svelte-compiler-options.interface';
+import { SvelteCompilationCache } from './svelte-compiler-options.interface';
 import {
   collectDeepNodes,
   getAllImports,
@@ -12,7 +12,14 @@ import {
 } from './ast-helpers';
 import * as path from 'path';
 import { getInputFileFromOutputFile, SCRIPT_TAG } from './utils';
-import { SymbolTable } from 'typescript';
+
+function findClassDeclaration(
+  declarations: ts.Declaration[],
+): ts.ClassDeclaration | null {
+  return declarations.find(decl =>
+    ts.isClassDeclaration(decl),
+  ) as ts.ClassDeclaration;
+}
 
 export class SvelteTypeChecker {
   constructor(
@@ -20,12 +27,14 @@ export class SvelteTypeChecker {
     private readonly typeChecker: ts.TypeChecker,
     private readonly bazelBin: string,
     private readonly compilerOpts: ts.CompilerOptions,
-    private readonly templateCache: SvelteTemplateCache,
+    private readonly compilationCache: SvelteCompilationCache,
   ) {}
 
+  // TODO: Use https://github.com/aceakash/string-similarity to help pinpoint typos
   private gatherAttrDiagnostics(
     sourceFile: ts.SourceFile,
-    members: SymbolTable,
+    scriptSource: string,
+    component: ts.ClassDeclaration,
     { attributes }: InlineComponent,
   ): ts.Diagnostic[] {
     const fileName = getInputFileFromOutputFile(
@@ -33,22 +42,41 @@ export class SvelteTypeChecker {
       this.bazelBin,
       this.bazelHost.inputFiles,
     );
-    let source = this.bazelHost.readFile(fileName);
 
-    let script = '';
-    source.replace(SCRIPT_TAG, (_, __, code) => (script = code));
-    source = source.replace(SCRIPT_TAG, `<script>${script}</script>`);
+    const source = this.bazelHost
+      .readFile(fileName)
+      .replace(SCRIPT_TAG, `<script>${scriptSource}</script>`);
 
     const identifiers = collectDeepNodes<ts.Identifier>(
       sourceFile,
       ts.SyntaxKind.Identifier,
     );
 
+    const file = ts.createSourceFile(
+      fileName,
+      source,
+      this.compilerOpts.target,
+    );
+
+    const memberNames = component.members.map(member => {
+      return (member.name as ts.Identifier).escapedText.toString();
+    });
+
     return attributes.reduce(
       (diagnostics, attr) => {
         // Attribute identifier does not exist
         // This is the value we have to check if exist on the component
-        log(attr.name);
+        if (!memberNames.includes(attr.name)) {
+          diagnostics.push({
+            category: ts.DiagnosticCategory.Error,
+            start: attr.start,
+            length: attr.name.length,
+            messageText: `Attribute "${attr.name}" doesn't exist on ${component.name.escapedText}`,
+            code: 0,
+            file,
+          });
+        }
+
         // @ts-ignore
         attr.value.forEach(({ expression }) => {
           // Validates that identifier exists
@@ -59,16 +87,12 @@ export class SvelteTypeChecker {
             )
           ) {
             diagnostics.push({
-              file: ts.createSourceFile(
-                fileName,
-                source,
-                this.compilerOpts.target,
-              ),
               category: ts.DiagnosticCategory.Error,
               start: expression.start,
               length: expression.end - expression.start,
-              messageText: `Identifier "${expression.name}" doesn't not exist in source`,
+              messageText: `Identifier "${expression.name}" cannot be found`,
               code: 0,
+              file,
             });
           } else {
           }
@@ -81,7 +105,9 @@ export class SvelteTypeChecker {
   }
 
   gatherAllDiagnostics(sourceFile: ts.SourceFile): ts.Diagnostic[] {
-    const compilation = this.templateCache.get(sourceFile.fileName);
+    const [compiledSource, compilation] = this.compilationCache.get(
+      sourceFile.fileName,
+    );
     const diagnostics: ts.Diagnostic[] = [];
 
     if (compilation) {
@@ -129,17 +155,19 @@ export class SvelteTypeChecker {
           { text: moduleName },
         ] of componentImports.values()) {
           const type = this.typeChecker.getTypeAtLocation(identifier);
+          const componentDecl = findClassDeclaration(type.symbol.declarations);
           const componentNode = getComponentNode(identifier);
           // TODO: Type check if import is a class which extends SvelteComponent/SvelteComponentDev
           // TODO: Type check methods
           // TODO: Type check props
 
-          if (type.symbol) {
+          if (componentDecl) {
             // @ts-ignore
             diagnostics.push(
               ...this.gatherAttrDiagnostics(
                 sourceFile,
-                type.symbol.members,
+                compiledSource,
+                componentDecl,
                 componentNode,
               ),
             );

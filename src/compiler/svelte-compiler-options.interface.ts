@@ -8,4 +8,4 @@ export interface SvelteCompilerOptions extends CompileOptions {
 
 export type SvelteCompilation = ReturnType<typeof compile>;
 
-export type SvelteTemplateCache = Map<string, SvelteCompilation>;
+export type SvelteCompilationCache = Map<string, [string, SvelteCompilation]>;

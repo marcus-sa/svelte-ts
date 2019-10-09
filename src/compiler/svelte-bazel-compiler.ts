@@ -19,7 +19,7 @@ import {
 import {
   SvelteCompilation,
   SvelteCompilerOptions,
-  SvelteTemplateCache,
+  SvelteCompilationCache,
 } from './svelte-compiler-options.interface';
 import {
   createSvelteComponentImport,
@@ -59,7 +59,7 @@ export const defaultCompilerOptions: ts.CompilerOptions = {
 
 export class SvelteBazelCompiler {
   /** The one FileCache instance used in this process. */
-  private readonly svelteTemplateCache: SvelteTemplateCache = new Map();
+  private readonly svelteCompilationCache: SvelteCompilationCache = new Map();
   private readonly fileCache = new FileCache<ts.SourceFile>(debug);
   private readonly compilerOpts: ts.CompilerOptions;
   private readonly bazelOpts: BazelOptions;
@@ -245,7 +245,7 @@ export class SvelteBazelCompiler {
 
     this.handleSvelteCompilationWarnings(compilation);
 
-    this.svelteTemplateCache.set(sourceFileName, compilation);
+    this.svelteCompilationCache.set(sourceFileName, [content, compilation]);
 
     return compilation.js.code;
   }
@@ -346,7 +346,7 @@ export class SvelteBazelCompiler {
       typeChecker,
       this.bazelBin,
       this.compilerOpts,
-      this.svelteTemplateCache,
+      this.svelteCompilationCache,
     );
 
     const diagnostics: ts.Diagnostic[] = [];
