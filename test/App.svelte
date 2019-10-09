@@ -1,22 +1,17 @@
 <script lang="typescript">
-  import { Button } from './Button';
+  let user = { loggedIn: false };
 
-  export const hello = 'Hello world';
-
-  // let icon = 'user';
+  function toggle() {
+  	user.loggedIn = !user.loggedIn;
+  }
 </script>
 
-<style lang="scss">
-  p {
-    color: red;
-  }
-
-  :global(body) {
-    /* this will apply to <body> */
-    margin: 0;
-  }
-</style>
-
-<button icon="{icon}">
-  { hello }
+{#if user.loggedIn}
+<button on:click="{toggle}">
+  Log out
 </button>
+{/if} {#if !user.loggedIn}
+<button on:click="{toggle}">
+  Log in
+</button>
+{/if}

@@ -3,15 +3,17 @@ import Attribute from 'svelte/types/compiler/compile/nodes/Attribute';
 import InlineComponent from 'svelte/types/compiler/compile/nodes/InlineComponent';
 import * as bazel from '@bazel/typescript';
 import { log } from '@bazel/typescript';
-
-import { SvelteCompilationCache } from './svelte-compiler-options.interface';
 import {
+  SCRIPT_TAG,
   collectDeepNodes,
+  getInputFileFromOutputFile,
   getAllImports,
-  getSvelteComponentNodes,
-} from './ast-helpers';
-import * as path from 'path';
-import { getInputFileFromOutputFile, SCRIPT_TAG } from './utils';
+  SvelteCompilationCache,
+  SvelteDiagnostic,
+} from '@svelte-ts/common';
+
+import { Node } from './interfaces';
+import { getInlineComponents, isFragment, isMustacheTag } from './ast-helpers';
 
 function findClassDeclaration(
   declarations: ts.Declaration[],
@@ -32,31 +34,18 @@ export class SvelteTypeChecker {
 
   // TODO: Use https://github.com/aceakash/string-similarity to help pinpoint typos
   private gatherAttrDiagnostics(
+    scriptFile: ts.SourceFile,
     sourceFile: ts.SourceFile,
-    scriptSource: string,
     component: ts.ClassDeclaration,
     { attributes }: InlineComponent,
-  ): ts.Diagnostic[] {
-    const fileName = getInputFileFromOutputFile(
-      sourceFile.fileName,
-      this.bazelBin,
-      this.bazelHost.inputFiles,
-    );
-
-    const source = this.bazelHost
-      .readFile(fileName)
-      .replace(SCRIPT_TAG, `<script>${scriptSource}</script>`);
-
+  ): SvelteDiagnostic[] {
     const identifiers = collectDeepNodes<ts.Identifier>(
-      sourceFile,
+      scriptFile,
       ts.SyntaxKind.Identifier,
     );
 
-    const file = ts.createSourceFile(
-      fileName,
-      source,
-      this.compilerOpts.target,
-    );
+    const identifiersHasNode = (node: Node): boolean =>
+      identifiers.some(({ escapedText }) => escapedText === node.name);
 
     const memberNames = component.members.map(member => {
       return (member.name as ts.Identifier).escapedText.toString();
@@ -71,9 +60,9 @@ export class SvelteTypeChecker {
             category: ts.DiagnosticCategory.Error,
             start: attr.start,
             length: attr.name.length,
-            messageText: `Attribute "${attr.name}" doesn't exist on ${component.name.escapedText}`,
-            code: 0,
-            file,
+            messageText: `Attribute '${attr.name}' doesn't exist on '${component.name.escapedText}'.`,
+            file: sourceFile,
+            code: attr.type,
           });
         }
 
@@ -81,18 +70,14 @@ export class SvelteTypeChecker {
         attr.value.forEach(({ expression }) => {
           // Validates that identifier exists
           // and if it does, then validate against the given type
-          if (
-            !identifiers.some(
-              ({ escapedText }) => escapedText === expression.name,
-            )
-          ) {
+          if (!identifiersHasNode(expression)) {
             diagnostics.push({
               category: ts.DiagnosticCategory.Error,
               start: expression.start,
               length: expression.end - expression.start,
-              messageText: `Identifier "${expression.name}" cannot be found`,
-              code: 0,
-              file,
+              messageText: `Identifier '${expression.name}' cannot be found`,
+              file: sourceFile,
+              code: expression.type,
             });
           } else {
           }
@@ -100,7 +85,7 @@ export class SvelteTypeChecker {
 
         return diagnostics;
       },
-      [] as ts.Diagnostic[],
+      [] as SvelteDiagnostic[],
     );
   }
 
@@ -108,55 +93,86 @@ export class SvelteTypeChecker {
     const [compiledSource, compilation] = this.compilationCache.get(
       sourceFile.fileName,
     );
-    const diagnostics: ts.Diagnostic[] = [];
+
+    const fileName = getInputFileFromOutputFile(
+      sourceFile.fileName,
+      this.bazelBin,
+      this.bazelHost.inputFiles,
+    );
+
+    const source = this.bazelHost
+      .readFile(fileName)
+      .replace(SCRIPT_TAG, `<script>${compiledSource}</script>`);
+
+    const compiledSvelteSourceFile = ts.createSourceFile(
+      fileName,
+      source,
+      this.compilerOpts.target,
+    );
+
+    const diagnostics: SvelteDiagnostic[] = [];
 
     if (compilation) {
-      const componentNodes = getSvelteComponentNodes(compilation.ast.html);
-
-      const hasComponentNode = (
-        node: ts.ImportClause | ts.ImportSpecifier,
-      ): boolean =>
-        componentNodes.some(({ name }) => name === node.name.escapedText);
+      const fragment = compilation.ast.html;
+      const componentNodes = getInlineComponents(fragment);
 
       const getComponentNode = (
         node: ts.ImportClause | ts.ImportSpecifier,
       ): InlineComponent =>
         componentNodes.find(({ name }) => name === node.name.escapedText);
 
+      const removeComponentNode = (
+        componentNode: InlineComponent,
+      ): InlineComponent[] =>
+        componentNodes.splice(componentNodes.indexOf(componentNode), 1);
+
       if (componentNodes.length) {
         const allImports = getAllImports(sourceFile);
-        const componentImports = new Set<
-          [ts.ImportClause | ts.ImportSpecifier, ts.StringLiteral]
+        const componentImports = new Map<
+          InlineComponent,
+          ts.ImportClause | ts.ImportSpecifier
         >();
 
+        const addComponentImport = (
+          node: ts.ImportClause | ts.ImportSpecifier,
+        ) => {
+          const componentNode = getComponentNode(node);
+          // there can be either propertyName or name which reflects the real name of the import
+          // if it is a named import, it'll have a "propertyName", otherwise the real import will be "name"
+          if (componentNode) {
+            componentImports.set(componentNode, node);
+            removeComponentNode(componentNode);
+          }
+        };
+
         // TODO: Check that components have been imported
-        for (const { importClause, moduleSpecifier } of allImports) {
+        for (const { importClause } of allImports) {
           if (ts.isNamedImports(importClause.namedBindings)) {
             for (const specifier of importClause.namedBindings.elements) {
               // there can be either propertyName or name which reflects the real name of the import
               // if it is a named import, it'll have a "propertyName", otherwise the real import will be "name"
-              if (hasComponentNode(specifier)) {
-                componentImports.add([
-                  specifier,
-                  moduleSpecifier as ts.StringLiteral,
-                ]);
-              }
+              addComponentImport(specifier);
             }
-          } else if (hasComponentNode(importClause)) {
-            componentImports.add([
-              importClause,
-              moduleSpecifier as ts.StringLiteral,
-            ]);
+          } else {
+            addComponentImport(importClause);
           }
         }
 
-        for (const [
-          identifier,
-          { text: moduleName },
-        ] of componentImports.values()) {
+        componentNodes.forEach(component => {
+          diagnostics.push({
+            file: compiledSvelteSourceFile,
+            category: ts.DiagnosticCategory.Error,
+            start: component.start,
+            length: component.end - component.start,
+            // Identifier
+            messageText: `Import declaration for '${component.name}' cannot be found.`,
+            code: component.type,
+          });
+        });
+
+        for (const [componentNode, identifier] of componentImports.entries()) {
           const type = this.typeChecker.getTypeAtLocation(identifier);
           const componentDecl = findClassDeclaration(type.symbol.declarations);
-          const componentNode = getComponentNode(identifier);
           // TODO: Type check if import is a class which extends SvelteComponent/SvelteComponentDev
           // TODO: Type check methods
           // TODO: Type check props
@@ -166,7 +182,7 @@ export class SvelteTypeChecker {
             diagnostics.push(
               ...this.gatherAttrDiagnostics(
                 sourceFile,
-                compiledSource,
+                compiledSvelteSourceFile,
                 componentDecl,
                 componentNode,
               ),
@@ -189,7 +205,7 @@ export class SvelteTypeChecker {
 
           //log(getComponentNode(identifier));
 
-          const moduleId = this.bazelHost.fileNameToModuleId(
+          /*const moduleId = this.bazelHost.fileNameToModuleId(
             sourceFile.fileName,
           );
           const containingFile = path.join(this.bazelBin, moduleId);
@@ -198,7 +214,7 @@ export class SvelteTypeChecker {
             containingFile,
             this.compilerOpts,
             this.bazelHost,
-          );
+          );*/
 
           /*if (resolvedModule) {
             const sourceFile = this.bazelHost.getSourceFile(
@@ -208,8 +224,16 @@ export class SvelteTypeChecker {
           }*/
         }
       }
+
+      if (isFragment(fragment)) {
+        fragment.children.forEach(child => {
+          log(child);
+          if (isMustacheTag(child)) {
+          }
+        });
+      }
     }
 
-    return diagnostics;
+    return <ts.Diagnostic[]>(<unknown>diagnostics);
   }
 }

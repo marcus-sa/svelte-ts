@@ -6,7 +6,6 @@ import {
   FileLoader,
   resolveNormalizedPath,
   UncachedFileLoader,
-  CompilerHost,
 } from '@bazel/typescript';
 
 export const BAZEL_BIN = /\b(blaze|bazel)-out\b.*?\bbin\b/;

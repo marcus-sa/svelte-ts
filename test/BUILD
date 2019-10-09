@@ -1,4 +1,4 @@
-load("//:index.bzl", "svelte_module")
+load("//packages/bazel:index.bzl", "svelte_module")
 load("@build_bazel_rules_nodejs//:index.bzl", "rollup_bundle")
 
 svelte_module(
@@ -7,7 +7,7 @@ svelte_module(
         "*.svelte",
         "*.ts",
     ]),
-    compiler = "//src/compiler",
+    compiler = "//packages/bazel:compiler",
     deps = [
         "//test/Button",
         "@npm//svelte",

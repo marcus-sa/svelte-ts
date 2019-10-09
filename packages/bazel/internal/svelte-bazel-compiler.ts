@@ -1,5 +1,6 @@
 // Inspired by https://github.com/angular/angular/blob/0119f46daf8f1efda00f723c5e329b0c8566fe07/packages/bazel/src/ngc-wrapped/index.ts
 
+import { SvelteTypeChecker } from '@svelte-ts/type-checker';
 import * as ts from 'typescript';
 import * as svelte from 'svelte/compiler';
 import * as fs from 'fs';
@@ -15,24 +16,8 @@ import {
   log,
   parseTsconfig,
 } from '@bazel/typescript';
-
-import {
-  SvelteCompilation,
-  SvelteCompilerOptions,
-  SvelteCompilationCache,
-} from './svelte-compiler-options.interface';
-import {
-  createSvelteComponentImport,
-  functionDeclarationToMethodDeclaration,
-  variableStatementToPropertyDeclaration,
-  getSvelteComponentIdentifier,
-  getSvelteComponentNodes,
-  getAllImports,
-} from './ast-helpers';
 import {
   SCRIPT_TAG,
-  SVELTE_JS_EXT,
-  MISSING_DECLARATION,
   BAZEL_BIN,
   createFileLoader,
   getSvelteNameFromPath,
@@ -41,10 +26,18 @@ import {
   isSvelteInputFile,
   isSvelteOutputFile,
   relativeToRootDirs,
-  SVELTE_EXT,
   getInputFileFromOutputFile,
-} from './utils';
-import { SvelteTypeChecker } from './svelte-type-checker';
+  SvelteCompilerOptions,
+  SvelteCompilationCache,
+  SvelteCompilation,
+} from '@svelte-ts/common';
+
+import {
+  createSvelteComponentImport,
+  functionDeclarationToMethodDeclaration,
+  variableStatementToPropertyDeclaration,
+  getSvelteComponentIdentifier,
+} from './ts-ast-helpers';
 
 export const defaultCompilerOptions: ts.CompilerOptions = {
   target: ts.ScriptTarget.ESNext,
@@ -54,7 +47,6 @@ export const defaultCompilerOptions: ts.CompilerOptions = {
   inlineSourceMap: false,
   sourceMap: true,
   allowNonTsExtensions: true,
-  // removeComments: true,
 };
 
 export class SvelteBazelCompiler {
@@ -135,14 +127,10 @@ export class SvelteBazelCompiler {
   }
 
   private handleSvelteCompilationWarnings({ warnings }: SvelteCompilation) {
+    // TODO: Convert compilation warnings to diagnostics
     warnings.forEach(warning => {
       if (!this.options.suppressWarnings.includes(warning.code)) {
-        if (warning.code === 'missing-declaration') {
-          const [, component] = warning.message.match(MISSING_DECLARATION);
-
-          if (!this.files.some(file => file.endsWith(component + '.svelte')))
-            return;
-        }
+        if (warning.code === 'missing-declaration') return;
 
         // console.log(`You can suppress this warning by putting "${warning.code}" into your Svelte compiler options`);
         log(warning.toString());
