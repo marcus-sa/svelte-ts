@@ -1,10 +1,14 @@
-# Bazel rules for Svelte TS
+# Svelte TS
+
+[![asciicast](https://asciinema.org/a/273360.svg)](https://asciinema.org/a/273360)
+
 #### Features
-* TypeScript usage in Svelte component scripts
-* Importing of Svelte templates in nested directories
-* Generates proper declaration files for compiled Svelte components
-* **(WIP)** Type checking support for components
-* **(WIP)** Sapper integration
+* Generation of Svelte component declarations
+* TypeScript support in template tags
+* **(WIP)** Template type checking support
+* **(TODO)** Sapper integration
+
+## Bazel
 
 #### Getting started
 1. Setup the Node & TS installation for Bazel by following their [guide](https://bazelbuild.github.io/rules_nodejs/TypeScript.html).
@@ -35,3 +39,10 @@ svelte_module(
     ],
 )
 ```
+
+## Rollup
+TODO
+
+## Webpack
+TODO
+
