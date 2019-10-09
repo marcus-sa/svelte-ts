@@ -17,10 +17,6 @@
       "yarn bazel:buildify",
       "git add"
     ],
-    "*.{svelte}": [
-      "prettier --write --parser=html",
-      "git add"
-    ],
     "*.{ts,js,html}": [
       "prettier --write",
       "git add"
