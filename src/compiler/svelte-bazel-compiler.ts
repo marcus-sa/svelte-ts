@@ -1,6 +1,5 @@
 // Inspired by https://github.com/angular/angular/blob/0119f46daf8f1efda00f723c5e329b0c8566fe07/packages/bazel/src/ngc-wrapped/index.ts
 
-import { formatDiagnostics } from '@angular/compiler-cli';
 import * as ts from 'typescript';
 import { compile, parse } from 'svelte/compiler';
 import * as fs from 'fs';
@@ -80,7 +79,7 @@ export class SvelteBazelCompiler {
 
     const [parsedOptions, errors] = parseTsconfig(project);
     if (errors && errors.length) {
-      throw console.error(formatDiagnostics(errors));
+      throw console.error(errors);
     }
 
     const { options: tsCompilerOpts, bazelOpts, files, config } = parsedOptions;
@@ -506,7 +505,9 @@ export class SvelteBazelCompiler {
     });
 
     if (allDiagnostics.length) {
-      console.error(formatDiagnostics(allDiagnostics));
+      console.error(
+        ts.formatDiagnosticsWithColorAndContext(allDiagnostics, this.bazelHost),
+      );
     }
 
     return !hasDiagnosticsErrors(allDiagnostics);

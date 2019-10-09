@@ -6,7 +6,6 @@ ts_library(
     srcs = glob(["**/*.ts"]),
     visibility = ["//visibility:public"],
     deps = [
-        "@npm//@angular/compiler-cli",
         "@npm//@bazel/typescript",
         "@npm//@types",
         "@npm//svelte",

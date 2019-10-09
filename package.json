@@ -27,7 +27,6 @@
     ]
   },
   "dependencies": {
-    "@angular/compiler-cli": "8.2.9",
     "tsickle": "0.37.0",
     "tslib": "1.10.0"
   },
@@ -38,13 +37,11 @@
     "typescript": "^3.6.3"
   },
   "devDependencies": {
-    "@angular/compiler": "8.2.9",
-    "@angular/compiler-cli": "8.2.9",
     "@bazel/bazel": "0.29.0",
     "@bazel/buildifier": "0.29.0",
     "@bazel/hide-bazel-files": "0.38.0",
-    "@bazel/typescript": "0.37.0",
     "@bazel/ibazel": "0.10.3",
+    "@bazel/typescript": "0.37.0",
     "@types/node": "12.7.7",
     "husky": "3.0.8",
     "lint-staged": "9.4.1",
