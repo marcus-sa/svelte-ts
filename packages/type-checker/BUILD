@@ -12,6 +12,7 @@ ts_library(
         "//packages/common",
         "@npm//@bazel/typescript",
         "@npm//@types",
+        "@npm//string-similarity",
         "@npm//svelte",
         "@npm//ts-simple-type",
         "@npm//tslib",

@@ -91,3 +91,13 @@ export function getInputFileFromOutputFile(
 
   return files.find(file => file.endsWith(relativeSourceFilePath));
 }
+
+export function formatDiagnosticMessageTexts(messages: string[]): string {
+  let tabs = '  ';
+
+  return messages.reduce((message, next) => {
+    message += '\n' + tabs + next;
+    tabs += '  ';
+    return message;
+  }, '');
+}

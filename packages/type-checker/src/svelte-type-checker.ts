@@ -1,28 +1,29 @@
 import * as ts from 'typescript';
-import * as bazel from '@bazel/typescript';
-import { log } from '@bazel/typescript';
+import { CompilerHost, log } from '@bazel/typescript';
+import { findBestMatch } from 'string-similarity';
 import {
   SCRIPT_TAG,
   collectDeepNodes,
   getInputFileFromOutputFile,
   getAllImports,
   findClassDeclaration,
+  getTextFromNamedDeclaration,
   SvelteCompilationCache,
   SvelteDiagnostic,
-  getTextFromNamedDeclaration,
+  formatDiagnosticMessageTexts,
 } from '@svelte-ts/common';
 
+import { IfBlock, InlineComponent } from './nodes';
+import { Node } from './interfaces';
 import {
   addParentNodeReferences,
   getInlineComponents,
   isMustacheTag,
 } from './ast-helpers';
-import { IfBlock, InlineComponent } from './nodes';
-import { Node } from './interfaces';
 
 export class SvelteTypeChecker {
   constructor(
-    private readonly bazelHost: bazel.CompilerHost,
+    private readonly bazelHost: CompilerHost,
     private readonly typeChecker: ts.TypeChecker,
     private readonly bazelBin: string,
     private readonly compilerOpts: ts.CompilerOptions,
@@ -53,28 +54,42 @@ export class SvelteTypeChecker {
         // Attribute identifier does not exist
         // This is the value we have to check if exist on the component
         if (!memberNames.includes(attr.name)) {
+          const { bestMatch } = findBestMatch(
+            attr.name.toLowerCase(),
+            memberNames,
+          );
+          const messages = [
+            `Attribute '${attr.name}' doesn't exist on '${component.name.escapedText}'.`,
+          ];
+
+          if (bestMatch.rating >= 0.4) {
+            messages.push(`Did you mean '${bestMatch.target}' instead?`);
+          }
+
           diagnostics.push({
             category: ts.DiagnosticCategory.Error,
             start: attr.start,
             length: attr.name.length,
-            messageText: `Attribute '${attr.name}' doesn't exist on '${component.name.escapedText}'.`,
             file: sourceFile,
             code: attr.type,
+            messageText: formatDiagnosticMessageTexts(messages),
           });
         }
 
         // @ts-ignore
-        attr.value.forEach(({ expression }) => {
+        attr.value.forEach(value => {
+          if (value.type === 'Text') return;
+
           // Validates that identifier exists
           // and if it does, then validate against the given type
-          if (!identifiersHasNode(expression)) {
+          if (value.expression && !identifiersHasNode(value.expression)) {
             diagnostics.push({
               category: ts.DiagnosticCategory.Error,
-              start: expression.start,
-              length: expression.end - expression.start,
-              messageText: `Identifier '${expression.name}' cannot be found`,
+              start: value.expression.start,
+              length: value.expression.end - value.expression.start,
+              messageText: `Identifier '${value.expression.name}' cannot be found`,
               file: sourceFile,
-              code: expression.type,
+              code: value.expression.type,
             });
           } else {
           }
@@ -139,14 +154,18 @@ export class SvelteTypeChecker {
       }
 
       componentNodes.forEach(component => {
+        const messageText = formatDiagnosticMessageTexts([
+          // Identifier
+          `Import declaration for '${component.name}' cannot be found.`,
+        ]);
+
         diagnostics.push({
           file: compiledSvelteFile,
           category: ts.DiagnosticCategory.Error,
           start: component.start,
           length: component.end - component.start,
-          // Identifier
-          messageText: `Import declaration for '${component.name}' cannot be found.`,
           code: component.type,
+          messageText,
         });
       });
 
@@ -252,7 +271,7 @@ export class SvelteTypeChecker {
       );
 
       fragment.children.forEach(child => {
-        log(child);
+        //log(child);
         if (isMustacheTag(child)) {
         }
       });

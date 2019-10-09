@@ -12,6 +12,13 @@ export type SvelteCompilation = ReturnType<typeof compile>;
 export type SvelteCompilationCache = Map<string, [string, SvelteCompilation]>;
 
 export interface SvelteDiagnostic
-  extends Omit<ts.DiagnosticRelatedInformation, 'code'> {
-  code: string;
+  extends Omit<ts.DiagnosticRelatedInformation, 'code' | 'messageText'> {
+  code: string | number;
+  messageText: string | SvelteDiagnosticMessageChain;
+}
+
+export interface SvelteDiagnosticMessageChain
+  extends Omit<ts.DiagnosticMessageChain, 'code' | 'next'> {
+  code: string | number;
+  next?: SvelteDiagnosticMessageChain;
 }

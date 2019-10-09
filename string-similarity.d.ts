@@ -6,7 +6,7 @@ declare module 'string-similarity' {
 
   export interface StringSimilarityMatch {
     bestMatchIndex: number;
-    bestMatch: string;
+    bestMatch: StringSimilarityRating;
     ratings: StringSimilarityRating[];
   }
 
