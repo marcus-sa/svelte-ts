@@ -1,4 +1,4 @@
-load("//:index.bzl", "svelte_module")
+load("//packages/bazel:index.bzl", "svelte_module")
 
 package(default_visibility = ["//test:__subpackages__"])
 
@@ -8,7 +8,7 @@ svelte_module(
         "*.svelte",
         "*.ts",
     ]),
-    compiler = "//src/compiler",
+    compiler = "//packages/bazel:compiler",
     deps = [
         "@npm//svelte",
     ],

@@ -53,18 +53,18 @@ export function variableStatementToPropertyDeclaration(
 ): ts.PropertyDeclaration {
   const {
     name: {
-      parent: { symbol, initializer },
+      parent: { symbol },
     },
     exclamationToken,
   } = variable.declarationList.declarations[0] as any;
   const type = checker.getTypeOfSymbolAtLocation(symbol, variable);
 
   return ts.createProperty(
-    variable.decorators,
+    undefined,
     undefined,
     symbol.escapedName as string,
     exclamationToken,
     checker.typeToTypeNode(type),
-    undefined, //initializer,
+    undefined,
   );
 }

@@ -1,5 +1,5 @@
 {
-  "name": "@svelte-ts/bazel",
+  "private": true,
   "license": "MIT",
   "scripts": {
     "bazel:buildify": "buildifier -v --warnings=attr-cfg,attr-license,attr-non-empty,attr-output-default,attr-single-file,constant-glob,ctx-args,depset-iteration,depset-union,dict-concatenation,duplicated-name,filetype,git-repository,http-archive,integer-division,load,load-on-top,native-build,native-package,output-group,package-name,package-on-top,positional-args,redefined-variable,repository-name,same-origin-load,string-iteration,unused-variable",
@@ -17,7 +17,11 @@
       "yarn bazel:buildify",
       "git add"
     ],
-    "*.{ts,js}": [
+    "*.{svelte}": [
+      "prettier --write --parser=html",
+      "git add"
+    ],
+    "*.{ts,js,html}": [
       "prettier --write",
       "git add"
     ]
@@ -33,11 +37,10 @@
     "typescript": "^3.6.3"
   },
   "devDependencies": {
-    "@angular/compiler": "8.2.9",
-    "@angular/compiler-cli": "8.2.9",
     "@bazel/bazel": "0.29.0",
     "@bazel/buildifier": "0.29.0",
     "@bazel/hide-bazel-files": "0.38.0",
+    "@bazel/ibazel": "0.10.3",
     "@bazel/typescript": "0.37.0",
     "@types/node": "12.7.7",
     "husky": "3.0.8",
@@ -45,7 +48,7 @@
     "prettier": "1.18.2",
     "sapper": "0.27.9",
     "svelte": "3.12.1",
-    "typescript": "3.6.3",
-    "webpack": "^4.41.0"
+    "ts-simple-type": "^0.3.6",
+    "typescript": "3.6.3"
   }
 }

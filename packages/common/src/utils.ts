@@ -11,7 +11,9 @@ import {
 export const BAZEL_BIN = /\b(blaze|bazel)-out\b.*?\bbin\b/;
 export const SVELTE_JS_EXT = /(.svelte.js)$/g;
 export const SVELTE_DTS_EXT = /(.svelte.d.ts)$/;
+export const SVELTE_EXT = /(.svelte.(d.ts|js))$/g;
 export const SCRIPT_TAG = /<script(\s[^]*?)?>([^]*?)<\/script>/gi;
+export const STYLE_TAG = /<style(\s[^]*?)?>([^]*?)<\/style>/gi;
 export const SVELTE_FILE_COMPONENT_NAME = /(.*?).svelte.(d.ts|js)$/;
 export const MISSING_DECLARATION = /'(.*?)'/;
 
@@ -29,6 +31,10 @@ export function isSvelteInputFile(fileName: string): boolean {
 
 export function getSvelteNameFromPath(fileName: string): string {
   return path.basename(fileName).match(SVELTE_FILE_COMPONENT_NAME)[1];
+}
+
+export function getTemplateFromSource(source: string): string {
+  return source.replace(SCRIPT_TAG, '').replace(STYLE_TAG, '');
 }
 
 export function createFileLoader(
@@ -74,34 +80,14 @@ export function hasDiagnosticsErrors(
   return diagnostics.some(d => d.category === ts.DiagnosticCategory.Error);
 }
 
-export function gatherDiagnosticsForInputsOnly(
-  program: ts.Program,
-): ts.Diagnostic[] {
-  const diagnostics: ts.Diagnostic[] = [];
-  // These checks mirror ts.getPreEmitDiagnostics, with the important
-  // exception of avoiding b/30708240, which is that if you call
-  // program.getDeclarationDiagnostics() it somehow corrupts the emit.
-  /*const strictDeps = new StrictDepsPlugin(program, {
-    rootDir: this.compilerOpts.rootDir,
-    allowedStrictDeps: this.bazelOpts.allowedStrictDeps,
-    compilationTargetSrc: this.bazelOpts.compilationTargetSrc,
-  });*/
+export function getInputFileFromOutputFile(
+  fileName: string,
+  bazelBin: string,
+  files: string[],
+): string | null {
+  const relativeSourceFilePath = fileName
+    .replace(bazelBin, '')
+    .replace(SVELTE_EXT, '.svelte');
 
-  diagnostics.push(...program.getOptionsDiagnostics());
-  diagnostics.push(...program.getGlobalDiagnostics());
-  const programFiles = program
-    .getSourceFiles()
-    .filter(sf => isSvelteInputFile(sf.fileName));
-
-  return programFiles.reduce(
-    (allDiagnostics, sf) => [
-      //diagnostics.push(...strictDeps.getDiagnostics(sf));
-      // Note: We only get the diagnostics for individual files
-      // to e.g. not check libraries.
-      ...allDiagnostics,
-      ...program.getSyntacticDiagnostics(sf),
-      ...program.getSemanticDiagnostics(sf),
-    ],
-    diagnostics,
-  );
+  return files.find(file => file.endsWith(relativeSourceFilePath));
 }

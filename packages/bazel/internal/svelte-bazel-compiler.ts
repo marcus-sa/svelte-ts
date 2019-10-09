@@ -1,10 +1,8 @@
 // Inspired by https://github.com/angular/angular/blob/0119f46daf8f1efda00f723c5e329b0c8566fe07/packages/bazel/src/ngc-wrapped/index.ts
 
-import { Warning } from 'svelte/types/compiler/interfaces';
-import { formatDiagnostics } from '@angular/compiler-cli';
+import { SvelteTypeChecker } from '@svelte-ts/type-checker';
 import * as ts from 'typescript';
-import { ModifierFlags, SyntaxKind } from 'typescript';
-import { compile } from 'svelte/compiler';
+import * as svelte from 'svelte/compiler';
 import * as fs from 'fs';
 import * as tsickle from 'tsickle';
 import * as path from 'path';
@@ -18,29 +16,28 @@ import {
   log,
   parseTsconfig,
 } from '@bazel/typescript';
-
-import { SvelteCompilerOptions } from './svelte-compiler-options.interface';
-import {
-  SVELTE_COMPONENT_IDENTIFIER,
-  createSvelteComponentImport,
-  functionDeclarationToMethodDeclaration,
-  variableStatementToPropertyDeclaration,
-  getSvelteComponentIdentifier,
-} from './ast-helpers';
 import {
   SCRIPT_TAG,
-  SVELTE_JS_EXT,
-  MISSING_DECLARATION,
   BAZEL_BIN,
   createFileLoader,
-  gatherDiagnosticsForInputsOnly,
   getSvelteNameFromPath,
   hasDiagnosticsErrors,
   isSvelteDeclarationFile,
   isSvelteInputFile,
   isSvelteOutputFile,
   relativeToRootDirs,
-} from './utils';
+  getInputFileFromOutputFile,
+  SvelteCompilerOptions,
+  SvelteCompilationCache,
+  SvelteCompilation,
+} from '@svelte-ts/common';
+
+import {
+  createSvelteComponentImport,
+  functionDeclarationToMethodDeclaration,
+  variableStatementToPropertyDeclaration,
+  getSvelteComponentIdentifier,
+} from './ts-ast-helpers';
 
 export const defaultCompilerOptions: ts.CompilerOptions = {
   target: ts.ScriptTarget.ESNext,
@@ -50,11 +47,11 @@ export const defaultCompilerOptions: ts.CompilerOptions = {
   inlineSourceMap: false,
   sourceMap: true,
   allowNonTsExtensions: true,
-  removeComments: true,
 };
 
 export class SvelteBazelCompiler {
   /** The one FileCache instance used in this process. */
+  private readonly svelteCompilationCache: SvelteCompilationCache = new Map();
   private readonly fileCache = new FileCache<ts.SourceFile>(debug);
   private readonly compilerOpts: ts.CompilerOptions;
   private readonly bazelOpts: BazelOptions;
@@ -75,7 +72,7 @@ export class SvelteBazelCompiler {
 
     const [parsedOptions, errors] = parseTsconfig(project);
     if (errors && errors.length) {
-      throw console.error(formatDiagnostics(errors));
+      throw console.error(errors);
     }
 
     const { options: tsCompilerOpts, bazelOpts, files, config } = parsedOptions;
@@ -129,15 +126,11 @@ export class SvelteBazelCompiler {
     );
   }
 
-  private handleSvelteCompilationWarnings(warnings: Warning[]) {
+  private handleSvelteCompilationWarnings({ warnings }: SvelteCompilation) {
+    // TODO: Convert compilation warnings to diagnostics
     warnings.forEach(warning => {
       if (!this.options.suppressWarnings.includes(warning.code)) {
-        if (warning.code === 'missing-declaration') {
-          const [, component] = warning.message.match(MISSING_DECLARATION);
-
-          if (!this.files.some(file => file.endsWith(component + '.svelte')))
-            return;
-        }
+        if (warning.code === 'missing-declaration') return;
 
         // console.log(`You can suppress this warning by putting "${warning.code}" into your Svelte compiler options`);
         log(warning.toString());
@@ -155,6 +148,7 @@ export class SvelteBazelCompiler {
     content.replace(SCRIPT_TAG, (_, __, code) => (source = code));
 
     return ts.createSourceFile(fileName, source, target);
+    // TODO: Validate against AST later
   }
 
   private createSvelteComponentDeclarationSource(
@@ -189,12 +183,13 @@ export class SvelteBazelCompiler {
       getSvelteComponentIdentifier(this.options.dev),
     );
 
-    const heritageClause = ts.createHeritageClause(SyntaxKind.ExtendsKeyword, [
-      type,
-    ]);
+    const heritageClause = ts.createHeritageClause(
+      ts.SyntaxKind.ExtendsKeyword,
+      [type],
+    );
 
     const exportDefaultModifier = ts.createModifiersFromModifierFlags(
-      ModifierFlags.ExportDefault,
+      ts.ModifierFlags.ExportDefault,
     );
     const component = ts.createClassDeclaration(
       undefined,
@@ -219,28 +214,28 @@ export class SvelteBazelCompiler {
   }
 
   private compileSvelteSource(fileName: string, content: string): string {
-    const relativeSourceFilePath = fileName
-      .replace(this.bazelBin, '')
-      .replace(SVELTE_JS_EXT, '.svelte');
-
-    const sourceFile = this.files.find(file =>
-      file.endsWith(relativeSourceFilePath),
+    const sourceFileName = getInputFileFromOutputFile(
+      fileName,
+      this.bazelBin,
+      this.files,
     );
-    const source = this.bazelHost.readFile(sourceFile);
+    const source = this.bazelHost.readFile(sourceFileName);
     const script = source.replace(SCRIPT_TAG, `<script>${content}</script>`);
 
     const options = { ...this.options };
     delete options.expectedOuts;
     delete options.suppressWarnings;
 
-    const { js, warnings } = compile(script, {
-      filename: relativeSourceFilePath,
+    const compilation = svelte.compile(script, {
+      filename: sourceFileName,
       ...options,
     });
 
-    this.handleSvelteCompilationWarnings(warnings);
+    this.handleSvelteCompilationWarnings(compilation);
 
-    return js.code;
+    this.svelteCompilationCache.set(sourceFileName, [content, compilation]);
+
+    return compilation.js.code;
   }
 
   private overrideBazelHost() {
@@ -332,6 +327,46 @@ export class SvelteBazelCompiler {
     };
   }
 
+  private gatherDiagnosticsForInputsOnly(): ts.Diagnostic[] {
+    const typeChecker = this.program.getTypeChecker();
+    const svelteTypeChecker = new SvelteTypeChecker(
+      this.bazelHost,
+      typeChecker,
+      this.bazelBin,
+      this.compilerOpts,
+      this.svelteCompilationCache,
+    );
+
+    const diagnostics: ts.Diagnostic[] = [];
+    // These checks mirror ts.getPreEmitDiagnostics, with the important
+    // exception of avoiding b/30708240, which is that if you call
+    // program.getDeclarationDiagnostics() it somehow corrupts the emit.
+    /*const strictDeps = new StrictDepsPlugin(program, {
+      rootDir: this.compilerOpts.rootDir,
+      allowedStrictDeps: this.bazelOpts.allowedStrictDeps,
+      compilationTargetSrc: this.bazelOpts.compilationTargetSrc,
+    });*/
+
+    diagnostics.push(...this.program.getOptionsDiagnostics());
+    diagnostics.push(...this.program.getGlobalDiagnostics());
+    const programFiles = this.program
+      .getSourceFiles()
+      .filter(sf => isSvelteInputFile(sf.fileName));
+
+    return programFiles.reduce(
+      (allDiagnostics, sf) => [
+        //diagnostics.push(...strictDeps.getDiagnostics(sf));
+        // Note: We only get the diagnostics for individual files
+        // to e.g. not check libraries.c
+        ...allDiagnostics,
+        ...svelteTypeChecker.gatherAllDiagnostics(sf),
+        ...this.program.getSyntacticDiagnostics(sf),
+        ...this.program.getSemanticDiagnostics(sf),
+      ],
+      diagnostics,
+    );
+  }
+
   compile(): boolean {
     this.overrideBazelHost();
 
@@ -348,14 +383,13 @@ export class SvelteBazelCompiler {
       host: this.bazelHost,
     });
 
-    const allDiagnostics = gatherDiagnosticsForInputsOnly(this.program);
-
     const emitResult = tsickle.emit(
       this.program,
       this.bazelHost,
       this.bazelHost.writeFile,
     );
 
+    const allDiagnostics = this.gatherDiagnosticsForInputsOnly();
     allDiagnostics.push(...emitResult.diagnostics);
 
     let externs = '/** @externs */\n';
@@ -381,7 +415,9 @@ export class SvelteBazelCompiler {
     });
 
     if (allDiagnostics.length) {
-      console.error(formatDiagnostics(allDiagnostics));
+      console.error(
+        ts.formatDiagnosticsWithColorAndContext(allDiagnostics, this.bazelHost),
+      );
     }
 
     return !hasDiagnosticsErrors(allDiagnostics);

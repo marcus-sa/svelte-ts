@@ -9,11 +9,13 @@
 		],
 		"emitDecoratorMetadata": true,
 		"experimentalDecorators": true,
-		"importHelpers": true
-	},
-	"include": [
-		"**/*.ts"
-	],
+		"importHelpers": true,
+    "paths": {
+      "@svelte-ts/*": [
+        "./packages/*"
+      ]
+    }
+  },
 	"exclude": [
 		"dist",
 		"bazel-*",
