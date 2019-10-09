@@ -33,3 +33,15 @@ export function getAllImports(sourceFile: ts.SourceFile) {
     ts.SyntaxKind.ImportDeclaration,
   );
 }
+
+export function findClassDeclaration(
+  declarations: ts.Declaration[],
+): ts.ClassDeclaration | null {
+  return declarations.find(decl =>
+    ts.isClassDeclaration(decl),
+  ) as ts.ClassDeclaration;
+}
+
+export function getTextFromNamedDeclaration(node: ts.NamedDeclaration): string {
+  return (node.name as ts.Identifier).escapedText as string;
+}
