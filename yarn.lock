@@ -1496,6 +1496,11 @@ to-regex-range@^5.0.1:
   dependencies:
     is-number "^7.0.0"
 
+ts-simple-type@^0.3.6:
+  version "0.3.6"
+  resolved "https://registry.yarnpkg.com/ts-simple-type/-/ts-simple-type-0.3.6.tgz#aa5a107c420c3ebe9cf5de2fe426984d0f77c665"
+  integrity sha512-dybO9ebUqOzldR5+SPP1uQSbxl/uiSIvjRC7dFuU45XE7H+4EoQMuxCFKoZj99qEo7pdDWSx52DEQAPZqL3SFg==
+
 tsickle@0.37.0:
   version "0.37.0"
   resolved "https://registry.yarnpkg.com/tsickle/-/tsickle-0.37.0.tgz#cc8a174310ac349913c62477b346db4f342c87d1"

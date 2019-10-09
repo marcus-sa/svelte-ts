@@ -1,13 +1,10 @@
 import { Node as SvelteNode } from 'svelte/types/compiler/interfaces';
+import InlineComponent from 'svelte/types/compiler/compile/nodes/InlineComponent';
 import * as ts from 'typescript';
-
-export type SvelteComponentNode = SvelteNode & {
-  type: 'InlineComponent';
-};
 
 export function isSvelteComponentNode(
   node: SvelteNode,
-): node is SvelteComponentNode {
+): node is InlineComponent {
   return node.type === 'InlineComponent';
 }
 
@@ -114,10 +111,8 @@ export function getAllImports(sourceFile: ts.SourceFile) {
   );
 }
 
-export function getSvelteComponentNodes(
-  node: SvelteNode,
-): SvelteComponentNode[] {
-  const components: SvelteComponentNode[] = [];
+export function getSvelteComponentNodes(node: SvelteNode): InlineComponent[] {
+  const components: InlineComponent[] = [];
 
   if (isSvelteComponentNode(node)) {
     components.push(node);

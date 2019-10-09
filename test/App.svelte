@@ -1,9 +1,9 @@
 <script lang="typescript">
-  import { Button } from './Button/#index';
+  import { Button } from './Button';
 
-  export const hello: string = 'Hello world';
+  export const hello = 'Hello world';
 
-  let icon = 'user';
+  // let icon = 'user';
 </script>
 
 <style lang="scss">
@@ -17,6 +17,6 @@
   }
 </style>
 
-<button lol="{icon}">
+<button icon="{icon}">
   { hello }
 </button>

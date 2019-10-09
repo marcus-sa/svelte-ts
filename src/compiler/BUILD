@@ -9,6 +9,7 @@ ts_library(
         "@npm//@bazel/typescript",
         "@npm//@types",
         "@npm//svelte",
+        "@npm//ts-simple-type",
         "@npm//tsickle",
         "@npm//tslib",
         "@npm//typescript",

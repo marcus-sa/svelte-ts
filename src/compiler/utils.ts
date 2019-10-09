@@ -12,6 +12,7 @@ import {
 export const BAZEL_BIN = /\b(blaze|bazel)-out\b.*?\bbin\b/;
 export const SVELTE_JS_EXT = /(.svelte.js)$/g;
 export const SVELTE_DTS_EXT = /(.svelte.d.ts)$/;
+export const SVELTE_EXT = /(.svelte.(d.ts|js))$/g;
 export const SCRIPT_TAG = /<script(\s[^]*?)?>([^]*?)<\/script>/gi;
 export const STYLE_TAG = /<style(\s[^]*?)?>([^]*?)<\/style>/gi;
 export const SVELTE_FILE_COMPONENT_NAME = /(.*?).svelte.(d.ts|js)$/;
@@ -78,4 +79,16 @@ export function hasDiagnosticsErrors(
   diagnostics: ReadonlyArray<ts.Diagnostic>,
 ) {
   return diagnostics.some(d => d.category === ts.DiagnosticCategory.Error);
+}
+
+export function getInputFileFromOutputFile(
+  fileName: string,
+  bazelBin: string,
+  files: string[],
+): string | null {
+  const relativeSourceFilePath = fileName
+    .replace(bazelBin, '')
+    .replace(SVELTE_EXT, '.svelte');
+
+  return files.find(file => file.endsWith(relativeSourceFilePath));
 }
