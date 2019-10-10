@@ -32,7 +32,7 @@ export interface Node {
   [prop: string]: any;
 }
 
-export interface InlineComponent extends Node {
+export interface Component extends Node {
   type: 'InlineComponent';
   name: string;
   attributes: Attribute[];

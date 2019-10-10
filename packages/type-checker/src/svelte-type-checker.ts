@@ -218,7 +218,7 @@ export class SvelteTypeChecker {
     scriptSourceFile: ts.SourceFile,
     compiledSourceFile: ts.SourceFile,
     componentDeclaration: ts.ClassDeclaration,
-    component: svelte.InlineComponent,
+    component: svelte.Component,
   ): svelte.Diagnostic[] {
     // FIX: Needs to be declarations
     const declarations = svelte.collectDeepNodes<ts.VariableDeclaration>(
@@ -266,20 +266,20 @@ export class SvelteTypeChecker {
 
     const getComponentNode = (
       node: ts.ImportClause | ts.ImportSpecifier,
-    ): svelte.InlineComponent =>
+    ): svelte.Component =>
       componentNodes.find(
         ({ name }) => name === svelte.getDeclarationName(node),
       );
 
     const removeComponentNode = (
-      componentNode: svelte.InlineComponent,
-    ): svelte.InlineComponent[] =>
+      componentNode: svelte.Component,
+    ): svelte.Component[] =>
       componentNodes.splice(componentNodes.indexOf(componentNode), 1);
 
     if (componentNodes.length) {
       const allImports = svelte.getAllImports(scriptSourceFile);
       const componentImports = new Map<
-        svelte.InlineComponent,
+        svelte.Component,
         ts.ImportClause | ts.ImportSpecifier
       >();
 

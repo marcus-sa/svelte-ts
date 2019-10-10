@@ -6,11 +6,11 @@ import {
   Spread,
   Attribute,
   AttributeShorthand,
-  InlineComponent,
+  Component,
 } from './interfaces';
 
-export function getComponents(node: Node): InlineComponent[] {
-  const components: InlineComponent[] = [];
+export function getComponents(node: Node): Component[] {
+  const components: Component[] = [];
 
   if (isInlineComponent(node)) {
     components.push(node);
@@ -42,7 +42,7 @@ export function isAttributeShortHand(node: Node): node is AttributeShorthand {
   return node.type === 'AttributeShorthand';
 }
 
-export function isInlineComponent(node: Node): node is InlineComponent {
+export function isInlineComponent(node: Node): node is Component {
   return node.type === 'InlineComponent';
 }
 
