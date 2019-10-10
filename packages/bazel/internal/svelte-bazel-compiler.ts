@@ -2,7 +2,7 @@
 
 import { SvelteTypeChecker } from '@svelte-ts/type-checker';
 import * as ts from 'typescript';
-import * as svelte from 'svelte/compiler';
+import * as svelte from '@svelte-ts/common';
 import * as fs from 'fs';
 import * as tsickle from 'tsickle';
 import * as path from 'path';
@@ -16,21 +16,8 @@ import {
   log,
   parseTsconfig,
 } from '@bazel/typescript';
-import {
-  SCRIPT_TAG,
-  BAZEL_BIN,
-  createFileLoader,
-  getSvelteNameFromPath,
-  hasDiagnosticsErrors,
-  isSvelteDeclarationFile,
-  isSvelteInputFile,
-  isSvelteOutputFile,
-  relativeToRootDirs,
-  getInputFileFromOutputFile,
-  SvelteCompilerOptions,
-  SvelteCompilationCache,
-  SvelteCompilation,
-} from '@svelte-ts/common';
+
+import { relativeToRootDirs, createFileLoader } from './utils';
 
 import {
   createSvelteComponentImport,
@@ -52,11 +39,11 @@ export const defaultCompilerOptions: ts.CompilerOptions = {
 
 export class SvelteBazelCompiler {
   /** The one FileCache instance used in this process. */
-  private readonly svelteCompilationCache: SvelteCompilationCache = new Map();
+  private readonly svelteCompilationCache: svelte.CompilationCache = new Map();
   private readonly fileCache = new FileCache<ts.SourceFile>(debug);
   private readonly compilerOpts: ts.CompilerOptions;
   private readonly bazelOpts: BazelOptions;
-  private readonly options: SvelteCompilerOptions;
+  private readonly options: svelte.CompilerOptions;
   private readonly tsHost: ts.CompilerHost;
   private readonly fileLoader: FileLoader;
   private readonly bazelHost: CompilerHost;
@@ -94,7 +81,7 @@ export class SvelteBazelCompiler {
     }
 
     this.bazelBin = tsCompilerOpts.rootDirs.find(rootDir =>
-      BAZEL_BIN.test(rootDir),
+      svelte.BAZEL_BIN.test(rootDir),
     );
     if (!this.bazelBin) {
       throw new Error(
@@ -102,7 +89,7 @@ export class SvelteBazelCompiler {
       );
     }
 
-    const options = config['svelteCompilerOptions'] as SvelteCompilerOptions;
+    const options = config['svelteCompilerOptions'] as svelte.CompilerOptions;
 
     options.expectedOuts = options.expectedOuts.map(p => p.replace(/\\/g, '/'));
     // TODO
@@ -127,7 +114,7 @@ export class SvelteBazelCompiler {
     );
   }
 
-  private handleSvelteCompilationWarnings({ warnings }: SvelteCompilation) {
+  private handleSvelteCompilationWarnings({ warnings }: svelte.Compilation) {
     // TODO: Convert compilation warnings to diagnostics
     warnings.forEach(warning => {
       if (!this.options.suppressWarnings.includes(warning.code)) {
@@ -146,7 +133,7 @@ export class SvelteBazelCompiler {
     const content = this.bazelHost.readFile(fileName);
 
     let source = '';
-    content.replace(SCRIPT_TAG, (_, __, code) => (source = code));
+    content.replace(svelte.SCRIPT_TAG, (_, __, code) => (source = code));
 
     return ts.createSourceFile(fileName, source, target);
     // TODO: Validate against AST later
@@ -179,7 +166,7 @@ export class SvelteBazelCompiler {
     });
 
     const svelteComponentImport = createSvelteComponentImport(this.options.dev);
-    const componentName = getSvelteNameFromPath(fileName);
+    const componentName = svelte.getNameFromPath(fileName);
 
     const type = ts.createExpressionWithTypeArguments(
       undefined,
@@ -217,13 +204,16 @@ export class SvelteBazelCompiler {
   }
 
   private compileSvelteSource(fileName: string, content: string): string {
-    const sourceFileName = getInputFileFromOutputFile(
+    const sourceFileName = svelte.getInputFileFromOutputFile(
       fileName,
       this.bazelBin,
       this.files,
     );
     const source = this.bazelHost.readFile(sourceFileName);
-    const script = source.replace(SCRIPT_TAG, `<script>${content}</script>`);
+    const script = source.replace(
+      svelte.SCRIPT_TAG,
+      `<script>${content}</script>`,
+    );
 
     const options = { ...this.options };
     delete options.expectedOuts;
@@ -274,7 +264,7 @@ export class SvelteBazelCompiler {
         return true;
 
       return (
-        originalHostShouldNameModule(fileName) || isSvelteOutputFile(fileName)
+        originalHostShouldNameModule(fileName) || svelte.isOutputFile(fileName)
       );
     };
 
@@ -286,11 +276,11 @@ export class SvelteBazelCompiler {
       onError?: (message: string) => void,
       sourceFiles?: ts.SourceFile[],
     ) => {
-      if (isSvelteOutputFile(fileName)) {
+      if (svelte.isOutputFile(fileName)) {
         content = this.compileSvelteSource(fileName, content);
       }
 
-      if (isSvelteDeclarationFile(fileName)) {
+      if (svelte.isDeclarationFile(fileName)) {
         content = this.createSvelteComponentDeclarationSource(
           fileName,
           sourceFiles[0],
@@ -322,7 +312,7 @@ export class SvelteBazelCompiler {
       fileName: string,
       target: ts.ScriptTarget,
     ): ts.SourceFile => {
-      if (isSvelteInputFile(fileName)) {
+      if (svelte.isInputFile(fileName)) {
         return this.createSvelteSourceFile(fileName, target);
       }
 
@@ -354,7 +344,7 @@ export class SvelteBazelCompiler {
     diagnostics.push(...this.program.getGlobalDiagnostics());
     const programFiles = this.program
       .getSourceFiles()
-      .filter(sf => isSvelteInputFile(sf.fileName));
+      .filter(sf => svelte.isInputFile(sf.fileName));
 
     return programFiles.reduce(
       (allDiagnostics, sf) => [
@@ -423,6 +413,6 @@ export class SvelteBazelCompiler {
       );
     }
 
-    return !hasDiagnosticsErrors(allDiagnostics);
+    return !svelte.hasDiagnosticsErrors(allDiagnostics);
   }
 }

@@ -1,36 +1,13 @@
-import * as ts from 'typescript';
 import { CompilerHost, log } from '@bazel/typescript';
 import * as tsSimple from 'ts-simple-type';
-import { findBestMatch } from 'string-similarity';
-import {
-  SCRIPT_TAG,
-  collectDeepNodes,
-  getInputFileFromOutputFile,
-  getAllImports,
-  findClassDeclaration,
-  getIdentifierName,
-  SvelteCompilationCache,
-  SvelteDiagnostic,
-  formatDiagnosticMessageTexts,
-} from '@svelte-ts/common';
+import * as ts from 'typescript';
+import * as svelte from '@svelte-ts/common';
 
-import { IfBlock, InlineComponent } from './nodes';
-import { Identifier, Node } from './interfaces';
 import {
-  addParentNodeReferences,
-  getInlineComponents,
-  isAttribute,
-  isAttributeShortHand,
-  isIdentifier,
-  isInlineComponent,
-  isMustacheTag,
-  isSpread,
-} from './ast-helpers';
-import {
-  createAttributeNonExistentDiagnostic,
+  createNonExistentPropertyDiagnostic,
   createComponentTypesNotAssignableDiagnostic,
   createIdentifierNotFoundDiagnostic,
-} from '@svelte-ts/type-checker/src/diagnostics';
+} from './diagnostics';
 
 export class SvelteTypeChecker {
   constructor(
@@ -38,7 +15,7 @@ export class SvelteTypeChecker {
     private readonly typeChecker: ts.TypeChecker,
     private readonly bazelBin: string,
     private readonly compilerOpts: ts.CompilerOptions,
-    private readonly compilationCache: SvelteCompilationCache,
+    private readonly compilationCache: svelte.CompilationCache,
   ) {}
 
   private isAssignableToType(
@@ -52,33 +29,37 @@ export class SvelteTypeChecker {
     });
   }
 
-  private gatherAttributeDiagnostics(
+  private gatherPropertyDiagnostics(
     memberNames: string[],
-    identifierNames: string[],
-    identifiers: ts.Identifier[],
+    declarationNames: string[],
+    declarations: ts.NamedDeclaration[],
     component: ts.ClassDeclaration,
     sourceFile: ts.SourceFile,
-    node: Node,
-  ): SvelteDiagnostic[] {
-    const getIdentifierByNode = (node: Identifier): ts.Identifier | null =>
-      identifiers.find(
-        identifier => getIdentifierName(identifier) === node.name,
+    node: svelte.Node,
+  ): svelte.Diagnostic[] {
+    const getDeclarationByNode = (
+      node: svelte.Identifier,
+    ): ts.NamedDeclaration | null =>
+      declarations.find(
+        identifier => svelte.getDeclarationName(identifier) === node.name,
       );
 
-    const diagnostics: SvelteDiagnostic[] = [];
-
-    // log(node);
+    const diagnostics: svelte.Diagnostic[] = [];
 
     // Attribute identifier does not exist
     // This is the value we have to check if exist on the component
-    if (isIdentifier(node)) {
+    if (svelte.isIdentifier(node)) {
       // FIX: Needs to find an actual declaration
-      const identifier = getIdentifierByNode(node);
+      const identifier = getDeclarationByNode(node);
 
       // Identifier does not exist in context
       if (!identifier) {
         diagnostics.push(
-          createIdentifierNotFoundDiagnostic(identifierNames, node, sourceFile),
+          createIdentifierNotFoundDiagnostic(
+            declarationNames,
+            node,
+            sourceFile,
+          ),
         );
       } else {
         // Check if identifier is an object
@@ -86,7 +67,7 @@ export class SvelteTypeChecker {
         const type = this.typeChecker.getTypeAtLocation(identifier);
         const compType = this.typeChecker.getTypeAtLocation(component);
 
-        if (isSpread(node.parent)) {
+        if (svelte.isSpread(node.parent)) {
           /**
            * When attributes are spread, instead show that type is not assignable to component
            */
@@ -100,7 +81,7 @@ export class SvelteTypeChecker {
             });*/
             /*properties.forEach(property => {
               diagnostics.push(
-                createAttributeNonExistentDiagnostic(
+                createNonExistentPropertyDiagnostic(
                   memberNames,
                   property.,
                   component,
@@ -138,11 +119,11 @@ export class SvelteTypeChecker {
       }
     }
 
-    if (isAttribute(node)) {
+    if (svelte.isAttribute(node)) {
       // check that attribute exists
       if (!memberNames.includes(node.name)) {
         diagnostics.push(
-          createAttributeNonExistentDiagnostic(
+          createNonExistentPropertyDiagnostic(
             memberNames,
             node,
             component,
@@ -152,10 +133,10 @@ export class SvelteTypeChecker {
       } else {
         node.value.forEach(value => {
           diagnostics.push(
-            ...this.gatherAttributeDiagnostics(
+            ...this.gatherPropertyDiagnostics(
               memberNames,
-              identifierNames,
-              identifiers,
+              declarationNames,
+              declarations,
               component,
               sourceFile,
               value,
@@ -200,7 +181,7 @@ export class SvelteTypeChecker {
 
       if (!memberNames.includes(node.expression.name)) {
         diagnostics.push(
-          createAttributeNonExistentDiagnostic(
+          createNonExistentPropertyDiagnostic(
             memberNames,
             node.expression,
             component,
@@ -210,14 +191,18 @@ export class SvelteTypeChecker {
       }
     }*/
 
-    if (isMustacheTag(node) || isSpread(node) || isAttributeShortHand(node)) {
+    if (
+      svelte.isMustacheTag(node) ||
+      svelte.isSpread(node) ||
+      svelte.isAttributeShortHand(node)
+    ) {
       node.expression.parent = node;
 
       diagnostics.push(
-        ...this.gatherAttributeDiagnostics(
+        ...this.gatherPropertyDiagnostics(
           memberNames,
-          identifierNames,
-          identifiers,
+          declarationNames,
+          declarations,
           component,
           sourceFile,
           node.expression,
@@ -229,68 +214,72 @@ export class SvelteTypeChecker {
   }
 
   // Gathers diagnostics for attributes on Svelte components
-  private gatherInlineComponentAttributeDiagnostics(
+  private gatherComponentPropertyDiagnostics(
     scriptFile: ts.SourceFile,
     sourceFile: ts.SourceFile,
-    component: ts.ClassDeclaration,
-    inlineComponent: any,
-  ): SvelteDiagnostic[] {
+    componentDeclaration: ts.ClassDeclaration,
+    component: svelte.InlineComponent,
+  ): svelte.Diagnostic[] {
     // FIX: Needs to be declarations
-    const identifiers = collectDeepNodes<ts.Identifier>(
+    const declarations = svelte.collectDeepNodes<ts.VariableDeclaration>(
       scriptFile,
       ts.SyntaxKind.VariableDeclaration,
     );
 
-    const memberNames = component.members.map(member =>
-      getIdentifierName(member),
+    const memberNames = componentDeclaration.members.map(member =>
+      svelte.getDeclarationName(member),
     );
-    const identifierNames = identifiers.map(identifier =>
-      getIdentifierName(identifier),
+    const declarationNames = declarations.map(identifier =>
+      svelte.getDeclarationName(identifier),
     );
 
+    log(component);
+
     // this should be recursive
-    return inlineComponent.attributes.reduce(
+    return component.attributes.reduce(
       (diagnostics, node) => {
-        node.parent = inlineComponent;
+        node.parent = component;
 
         return [
           ...diagnostics,
-          ...this.gatherAttributeDiagnostics(
+          ...this.gatherPropertyDiagnostics(
             memberNames,
-            identifierNames,
-            identifiers,
-            component,
+            declarationNames,
+            declarations,
+            componentDeclaration,
             sourceFile,
             node,
           ),
         ];
       },
-      [] as SvelteDiagnostic[],
+      [] as svelte.Diagnostic[],
     );
   }
 
-  private gatherInlineComponentDiagnostics(
+  private gatherComponentDiagnostics(
     sourceFile: ts.SourceFile,
     compiledSvelteFile: ts.SourceFile,
-    fragment: Node,
-  ): SvelteDiagnostic[] {
-    const componentNodes = getInlineComponents(fragment);
-    const diagnostics: SvelteDiagnostic[] = [];
+    node: svelte.Node,
+  ): svelte.Diagnostic[] {
+    const componentNodes = svelte.getComponents(node);
+    const diagnostics: svelte.Diagnostic[] = [];
 
     const getComponentNode = (
       node: ts.ImportClause | ts.ImportSpecifier,
-    ): InlineComponent =>
-      componentNodes.find(({ name }) => name === getIdentifierName(node));
+    ): svelte.InlineComponent =>
+      componentNodes.find(
+        ({ name }) => name === svelte.getDeclarationName(node),
+      );
 
     const removeComponentNode = (
-      componentNode: InlineComponent,
-    ): InlineComponent[] =>
+      componentNode: svelte.InlineComponent,
+    ): svelte.InlineComponent[] =>
       componentNodes.splice(componentNodes.indexOf(componentNode), 1);
 
     if (componentNodes.length) {
-      const allImports = getAllImports(sourceFile);
+      const allImports = svelte.getAllImports(sourceFile);
       const componentImports = new Map<
-        InlineComponent,
+        svelte.InlineComponent,
         ts.ImportClause | ts.ImportSpecifier
       >();
 
@@ -320,7 +309,7 @@ export class SvelteTypeChecker {
       }
 
       componentNodes.forEach(component => {
-        const messageText = formatDiagnosticMessageTexts([
+        const messageText = svelte.formatDiagnosticMessageTexts([
           // Identifier
           `Import declaration for '${component.name}' cannot be found.`,
         ]);
@@ -335,20 +324,22 @@ export class SvelteTypeChecker {
         });
       });
 
-      for (const [componentNode, identifier] of componentImports.entries()) {
-        const type = this.typeChecker.getTypeAtLocation(identifier);
-        const componentDecl = findClassDeclaration(type.symbol.declarations);
+      for (const [componentNode, declaration] of componentImports.entries()) {
+        const type = this.typeChecker.getTypeAtLocation(declaration);
+        const componentDeclaration = svelte.findComponentDeclaration(
+          type.symbol.declarations,
+        );
         // TODO: Type check if import is a class which extends SvelteComponent/SvelteComponentDev
         // TODO: Type check methods
         // TODO: Type check props
 
-        if (componentDecl) {
+        if (componentDeclaration) {
           // @ts-ignore
           diagnostics.push(
-            ...this.gatherInlineComponentAttributeDiagnostics(
+            ...this.gatherComponentPropertyDiagnostics(
               sourceFile,
               compiledSvelteFile,
-              componentDecl,
+              componentDeclaration,
               componentNode,
             ),
           );
@@ -393,13 +384,13 @@ export class SvelteTypeChecker {
     return diagnostics;
   }
 
-  private gatherIfBlockDiagnostics(node: IfBlock) {}
+  // private gatherIfBlockDiagnostics(node: IfBlock) {}
 
-  private getCompiledSvelteFile(
+  private getCompiledSourceFile(
     sourceFile: ts.SourceFile,
     compiledSource: string,
   ): ts.SourceFile {
-    const fileName = getInputFileFromOutputFile(
+    const fileName = svelte.getInputFileFromOutputFile(
       sourceFile.fileName,
       this.bazelBin,
       this.bazelHost.inputFiles,
@@ -407,7 +398,7 @@ export class SvelteTypeChecker {
 
     const source = this.bazelHost
       .readFile(fileName)
-      .replace(SCRIPT_TAG, `<script>${compiledSource}</script>`);
+      .replace(svelte.SCRIPT_TAG, `<script>${compiledSource}</script>`);
 
     return ts.createSourceFile(fileName, source, this.compilerOpts.target);
   }
@@ -415,13 +406,13 @@ export class SvelteTypeChecker {
   private gatherNodeDiagnostics(
     sourceFile: ts.SourceFile,
     compiledSvelteFile: ts.SourceFile,
-    node: Node,
-  ): SvelteDiagnostic[] {
-    const diagnostics: SvelteDiagnostic[] = [];
+    node: svelte.Node,
+  ): svelte.Diagnostic[] {
+    const diagnostics: svelte.Diagnostic[] = [];
 
-    if (isInlineComponent(node)) {
+    if (svelte.isInlineComponent(node)) {
       diagnostics.push(
-        ...this.gatherInlineComponentDiagnostics(
+        ...this.gatherComponentDiagnostics(
           sourceFile,
           compiledSvelteFile,
           node,
@@ -448,12 +439,12 @@ export class SvelteTypeChecker {
       sourceFile.fileName,
     );
 
-    const compiledSvelteFile = this.getCompiledSvelteFile(
+    const compiledSvelteFile = this.getCompiledSourceFile(
       sourceFile,
       compiledSource,
     );
 
-    const diagnostics: SvelteDiagnostic[] = [];
+    const diagnostics: svelte.Diagnostic[] = [];
 
     if (compilation) {
       // HINT: There'll always be a top level fragment node

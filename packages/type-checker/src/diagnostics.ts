@@ -1,19 +1,12 @@
-import {
-  formatDiagnosticMessageTexts,
-  SvelteDiagnostic,
-} from '@svelte-ts/common';
 import { findBestMatch } from 'string-similarity';
 import * as ts from 'typescript';
-
-import { Attribute, Identifier } from './interfaces';
-import { log } from '@bazel/typescript';
-import { isAttributeShortHand } from '@svelte-ts/type-checker';
+import * as svelte from '@svelte-ts/common';
 
 export function createIdentifierNotFoundDiagnostic(
   identifiers: string[],
-  identifier: Identifier,
+  identifier: svelte.Identifier,
   sourceFile: ts.SourceFile,
-): SvelteDiagnostic {
+): svelte.Diagnostic {
   const messages: string[] = [`Identifier '${identifier.name}' doesn't exist.`];
 
   const { bestMatch } = findBestMatch(
@@ -29,22 +22,22 @@ export function createIdentifierNotFoundDiagnostic(
     category: ts.DiagnosticCategory.Error,
     start: identifier.start,
     length: identifier.end - identifier.start,
-    messageText: formatDiagnosticMessageTexts(messages),
+    messageText: svelte.formatDiagnosticMessageTexts(messages),
     code: identifier.type,
     file: sourceFile,
   };
 }
 
 export function createComponentTypesNotAssignableDiagnostic(
-  identifier: Identifier,
+  identifier: svelte.Identifier,
   typeA: ts.Type,
-  property: Attribute,
+  property: svelte.Attribute,
   component: ts.ClassDeclaration,
   typeB: ts.Type,
   sourceFile: ts.SourceFile,
   typeChecker: ts.TypeChecker,
-): SvelteDiagnostic {
-  const name = isAttributeShortHand(identifier.parent)
+): svelte.Diagnostic {
+  const name = svelte.isAttributeShortHand(identifier.parent)
     ? 'Shorthand'
     : 'Variable';
 
@@ -64,19 +57,19 @@ export function createComponentTypesNotAssignableDiagnostic(
     length: identifier.name.length,
     file: sourceFile,
     code: identifier.type,
-    messageText: formatDiagnosticMessageTexts(messages),
+    messageText: svelte.formatDiagnosticMessageTexts(messages),
   };
 }
 
-export function createAttributeNonExistentDiagnostic(
-  attributes: string[],
-  attribute: Identifier | Attribute,
+export function createNonExistentPropertyDiagnostic(
+  properties: string[],
+  property: svelte.Identifier | svelte.Attribute,
   component: ts.ClassDeclaration,
   sourceFile: ts.SourceFile,
-): SvelteDiagnostic {
-  const { bestMatch } = findBestMatch(attribute.name.toLowerCase(), attributes);
+): svelte.Diagnostic {
+  const { bestMatch } = findBestMatch(property.name.toLowerCase(), properties);
   const messages = [
-    `Attribute '${attribute.name}' doesn't exist on '${component.name.escapedText}'.`,
+    `Property '${property.name}' doesn't exist on '${component.name.escapedText}'.`,
   ];
 
   if (bestMatch.rating >= 0.4) {
@@ -85,10 +78,10 @@ export function createAttributeNonExistentDiagnostic(
 
   return {
     category: ts.DiagnosticCategory.Error,
-    start: attribute.start,
-    length: attribute.name.length,
+    start: property.start,
+    length: property.name.length,
     file: sourceFile,
-    code: attribute.type,
-    messageText: formatDiagnosticMessageTexts(messages),
+    code: property.type,
+    messageText: svelte.formatDiagnosticMessageTexts(messages),
   };
 }

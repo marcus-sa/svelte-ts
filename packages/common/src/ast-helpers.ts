@@ -6,11 +6,10 @@ import {
   Spread,
   Attribute,
   AttributeShorthand,
+  InlineComponent,
 } from './interfaces';
-import { IfBlock, InlineComponent } from './nodes';
-import { log } from '@bazel/typescript';
 
-export function getInlineComponents(node: Node): InlineComponent[] {
+export function getComponents(node: Node): InlineComponent[] {
   const components: InlineComponent[] = [];
 
   if (isInlineComponent(node)) {
@@ -18,7 +17,7 @@ export function getInlineComponents(node: Node): InlineComponent[] {
   }
 
   (node.children || []).forEach(child => {
-    components.push(...getInlineComponents(child));
+    components.push(...getComponents(child));
   });
 
   return components;
@@ -55,9 +54,9 @@ export function isIdentifier(node: Node): node is Identifier {
   return node.type === 'Identifier';
 }
 
-export function isIfBlock(node: Node): node is IfBlock {
+/*export function isIfBlock(node: Node): node is IfBlock {
   return node.type === 'IfBlock';
-}
+}*/
 
 export function isMustacheTag(node: Node): node is MustacheTag {
   return node.type === 'MustacheTag';
