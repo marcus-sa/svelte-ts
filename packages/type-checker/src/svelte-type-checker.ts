@@ -23,10 +23,19 @@ export class SvelteTypeChecker {
     typeB: ts.Type | ts.Node,
   ): boolean {
     return tsSimple.isAssignableToType(typeA, typeB, this.typeChecker, {
-      strict: true,
-      strictFunctionTypes: true,
-      strictNullChecks: true,
+      strictFunctionTypes: this.compilerOpts.strictFunctionTypes,
+      strictNullChecks: this.compilerOpts.strictNullChecks,
+      strict: this.compilerOpts.strict,
     });
+  }
+
+  private getDeclarationByNode(
+    declarations: ts.NamedDeclaration[],
+    node: svelte.Identifier | svelte.Component,
+  ): ts.NamedDeclaration {
+    return declarations.find(
+      declaration => svelte.getDeclarationName(declaration) === node.name,
+    );
   }
 
   private gatherPropertyDiagnostics(
@@ -37,23 +46,16 @@ export class SvelteTypeChecker {
     compiledSourceFile: ts.SourceFile,
     node: svelte.Node,
   ): svelte.Diagnostic[] {
-    const getDeclarationByNode = (
-      node: svelte.Identifier,
-    ): ts.NamedDeclaration | null =>
-      declarations.find(
-        identifier => svelte.getDeclarationName(identifier) === node.name,
-      );
-
     const diagnostics: svelte.Diagnostic[] = [];
 
     // Attribute identifier does not exist
     // This is the value we have to check if exist on the component
     if (svelte.isIdentifier(node)) {
       // FIX: Needs to find an actual declaration
-      const identifier = getDeclarationByNode(node);
+      const declaration = this.getDeclarationByNode(declarations, node);
 
       // Identifier does not exist in context
-      if (!identifier) {
+      if (!declaration) {
         diagnostics.push(
           createIdentifierNotFoundDiagnostic(
             declarationNames,
@@ -64,14 +66,14 @@ export class SvelteTypeChecker {
       } else {
         // Check if identifier is an object
         // and if identifier contains strict member names
-        const type = this.typeChecker.getTypeAtLocation(identifier);
-        const compType = this.typeChecker.getTypeAtLocation(component);
+        const declarationType = this.typeChecker.getTypeAtLocation(declaration);
+        const componentType = this.typeChecker.getTypeAtLocation(component);
 
         if (svelte.isSpread(node.parent)) {
           /**
            * When attributes are spread, instead show that type is not assignable to component
            */
-          if (!this.isAssignableToType(type, compType)) {
+          if (!this.isAssignableToType(componentType, declarationType)) {
             // TODO
             // log(this.typeChecker.typeToString(type));
             // log(this.typeChecker.typeToString(compType));
@@ -92,7 +94,7 @@ export class SvelteTypeChecker {
             //log(type.symbol.declarations.reduce((names, { properties }) => [...names, ...properties.map(property => getIdentifierName(property))], []));
           }
         } else {
-          const property = compType
+          const property = componentType
             .getProperties()
             .find(prop => prop.escapedName === node.name);
           const propertyType = this.typeChecker.getTypeAtLocation(
@@ -100,13 +102,11 @@ export class SvelteTypeChecker {
           );
 
           log(this.typeChecker.typeToString(type));
-          log(this.typeChecker.typeToString(propertyType));
-
-          if (!this.isAssignableToType(identifier, propertyType)) {
+          if (!this.isAssignableToType(propertyType, declarationType)) {
             diagnostics.push(
               createComponentTypesNotAssignableDiagnostic(
                 node,
-                type,
+                declarationType,
                 node as any,
                 component,
                 propertyType,
@@ -232,8 +232,6 @@ export class SvelteTypeChecker {
     const declarationNames = declarations.map(identifier =>
       svelte.getDeclarationName(identifier),
     );
-
-    log(component);
 
     // this should be recursive
     return component.attributes.reduce(
