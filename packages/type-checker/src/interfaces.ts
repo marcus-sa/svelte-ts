@@ -1,4 +1,4 @@
-import { MustacheTag, Transition } from 'svelte/types/compiler/interfaces';
+import { Transition, Text } from 'svelte/types/compiler/interfaces';
 
 export interface Node {
   start: number;
@@ -14,4 +14,27 @@ export interface Identifier extends Node {
   name: string;
 }
 
-export { MustacheTag, Transition };
+export interface AttributeShorthand extends Node {
+  type: 'AttributeShortHand';
+  expression: Identifier;
+}
+
+export interface Attribute extends Node {
+  type: 'Attribute';
+  name: string;
+  // Can be mostly anything
+  value: Node[];
+}
+
+export interface Spread extends Node {
+  type: 'Spread';
+  expression: Identifier;
+}
+
+export interface MustacheTag extends Node {
+  type: 'MustacheTag';
+  // Identifier
+  expression: Node | Identifier;
+}
+
+export { Transition };

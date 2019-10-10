@@ -9,7 +9,7 @@ svelte_module(
     ]),
     compiler = "//packages/bazel:compiler",
     deps = [
-        "//test/Button",
+        "//test/Alert",
         "@npm//svelte",
     ],
 )

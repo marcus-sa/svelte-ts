@@ -1,5 +1,14 @@
-import { MustacheTag, Node, Transition, Identifier } from './interfaces';
+import {
+  MustacheTag,
+  Node,
+  Transition,
+  Identifier,
+  Spread,
+  Attribute,
+  AttributeShorthand,
+} from './interfaces';
 import { IfBlock, InlineComponent } from './nodes';
+import { log } from '@bazel/typescript';
 
 export function getInlineComponents(node: Node): InlineComponent[] {
   const components: InlineComponent[] = [];
@@ -26,6 +35,14 @@ export function addParentNodeReferences(node: Node): Node {
   return node;
 }
 
+export function isAttribute(node: Node): node is Attribute {
+  return node.type === 'Attribute';
+}
+
+export function isAttributeShortHand(node: Node): node is AttributeShorthand {
+  return node.type === 'AttributeShorthand';
+}
+
 export function isInlineComponent(node: Node): node is InlineComponent {
   return node.type === 'InlineComponent';
 }
@@ -42,12 +59,10 @@ export function isIfBlock(node: Node): node is IfBlock {
   return node.type === 'IfBlock';
 }
 
-/*export function isMemberExpression(node: Node): node is MemberExpression
-
-export function isUnaryExpression(node: Node): node is UnaryExpression {
-
-}*/
-
 export function isMustacheTag(node: Node): node is MustacheTag {
   return node.type === 'MustacheTag';
+}
+
+export function isSpread(node: Node): node is Spread {
+  return node.type === 'Spread';
 }

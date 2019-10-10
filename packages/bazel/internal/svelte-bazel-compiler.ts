@@ -43,10 +43,11 @@ export const defaultCompilerOptions: ts.CompilerOptions = {
   target: ts.ScriptTarget.ESNext,
   module: ts.ModuleKind.ES2015,
   moduleResolution: ts.ModuleResolutionKind.NodeJs,
-  alwaysStrict: false,
+  //alwaysStrict: false,
   inlineSourceMap: false,
   sourceMap: true,
   allowNonTsExtensions: true,
+  strict: true,
 };
 
 export class SvelteBazelCompiler {
@@ -151,6 +152,8 @@ export class SvelteBazelCompiler {
     // TODO: Validate against AST later
   }
 
+  // const/function exports should be made readonly
+  // <script context="module">
   private createSvelteComponentDeclarationSource(
     fileName: string,
     sourceFile: ts.SourceFile,

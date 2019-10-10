@@ -55,7 +55,6 @@ export function variableStatementToPropertyDeclaration(
     name: {
       parent: { symbol },
     },
-    exclamationToken,
   } = variable.declarationList.declarations[0] as any;
   const type = checker.getTypeOfSymbolAtLocation(symbol, variable);
 
@@ -63,7 +62,7 @@ export function variableStatementToPropertyDeclaration(
     undefined,
     undefined,
     symbol.escapedName as string,
-    exclamationToken,
+    undefined,
     checker.typeToTypeNode(type),
     undefined,
   );

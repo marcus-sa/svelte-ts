@@ -41,7 +41,8 @@ def _svelte_tsconfig(ctx, files, srcs, **kwargs):
 
     svelte_compiler_options = {
         "expectedOuts": depset([o.path for o in expected_outs]).to_list(),
-        "format": "esm",
+        "format": "cjs",
+        "generate": "ssr",
         "accessors": True,
     }
 
