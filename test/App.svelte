@@ -1,13 +1,11 @@
 <script lang="typescript">
 	import { Alert } from './Alert';
 
-	const options = {
-	  type: 'info',
-  };
+	const type = 'error';
 
-	const type = {};
+	let type = t;
 </script>
 
-<Alert {type} {...options}>
+<Alert {type}>
   <div>Welcome to Svelte TS!</div>
 </Alert>

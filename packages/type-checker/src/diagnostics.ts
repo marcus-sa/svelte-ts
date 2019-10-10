@@ -2,7 +2,7 @@ import { findBestMatch } from 'string-similarity';
 import * as ts from 'typescript';
 import * as svelte from '@svelte-ts/common';
 
-export function createIdentifierNotFoundDiagnostic(
+export function createDeclarationNotFoundDiagnostic(
   identifiers: string[],
   identifier: svelte.Identifier,
   sourceFile: ts.SourceFile,
@@ -38,7 +38,7 @@ export function createComponentTypesNotAssignableDiagnostic(
   typeChecker: ts.TypeChecker,
 ): svelte.Diagnostic {
   const name = svelte.isAttributeShortHand(identifier.parent)
-    ? 'Shorthand'
+    ? 'Shorthand declaration'
     : 'Variable';
 
   const messages = [

@@ -1,5 +1,5 @@
 <script lang="typescript">
-  export let type: string;
+  export let type: 'success' | 'warning' | 'info' | 'error';
 </script>
 
 <div>

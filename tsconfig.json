@@ -5,8 +5,9 @@
 		"module": "commonjs",
 		"target": "es2017",
 		"lib": [
-			"esnext"
-		],
+      "esnext",
+      "dom"
+    ],
 		"emitDecoratorMetadata": true,
 		"experimentalDecorators": true,
 		"importHelpers": true,
