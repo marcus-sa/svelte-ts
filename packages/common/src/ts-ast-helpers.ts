@@ -35,12 +35,16 @@ export function getAllImports(sourceFile: ts.SourceFile) {
   );
 }
 
-export function findClassDeclaration(
+export function findComponentDeclaration(
   declarations: ts.Declaration[],
 ): ts.ClassDeclaration | null {
   return declarations.find(decl =>
     ts.isClassDeclaration(decl),
   ) as ts.ClassDeclaration;
+}
+
+export function getDeclarationName(node: ts.NamedDeclaration): string | null {
+  return ts.isIdentifier(node.name) ? (node.name.escapedText as string) : null;
 }
 
 export function getIdentifierName(node: any): string | null {
