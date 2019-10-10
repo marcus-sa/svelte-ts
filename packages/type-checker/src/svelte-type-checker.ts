@@ -1,5 +1,6 @@
 import * as ts from 'typescript';
 import { CompilerHost, log } from '@bazel/typescript';
+import * as tsSimple from 'ts-simple-type';
 import { findBestMatch } from 'string-similarity';
 import {
   SCRIPT_TAG,
@@ -7,19 +8,29 @@ import {
   getInputFileFromOutputFile,
   getAllImports,
   findClassDeclaration,
-  getTextFromNamedDeclaration,
+  getIdentifierName,
   SvelteCompilationCache,
   SvelteDiagnostic,
   formatDiagnosticMessageTexts,
 } from '@svelte-ts/common';
 
 import { IfBlock, InlineComponent } from './nodes';
-import { Node } from './interfaces';
+import { Identifier, Node } from './interfaces';
 import {
   addParentNodeReferences,
   getInlineComponents,
+  isAttribute,
+  isAttributeShortHand,
+  isIdentifier,
+  isInlineComponent,
   isMustacheTag,
+  isSpread,
 } from './ast-helpers';
+import {
+  createAttributeNonExistentDiagnostic,
+  createComponentTypesNotAssignableDiagnostic,
+  createIdentifierNotFoundDiagnostic,
+} from '@svelte-ts/type-checker/src/diagnostics';
 
 export class SvelteTypeChecker {
   constructor(
@@ -30,72 +41,229 @@ export class SvelteTypeChecker {
     private readonly compilationCache: SvelteCompilationCache,
   ) {}
 
-  // TODO: Use https://github.com/aceakash/string-similarity to help pinpoint typos
+  private isAssignableToType(
+    typeA: ts.Type | ts.Node,
+    typeB: ts.Type | ts.Node,
+  ): boolean {
+    return tsSimple.isAssignableToType(typeA, typeB, this.typeChecker, {
+      strict: true,
+      strictFunctionTypes: true,
+      strictNullChecks: true,
+    });
+  }
+
+  private gatherAttributeDiagnostics(
+    memberNames: string[],
+    identifierNames: string[],
+    identifiers: ts.Identifier[],
+    component: ts.ClassDeclaration,
+    sourceFile: ts.SourceFile,
+    node: Node,
+  ): SvelteDiagnostic[] {
+    const getIdentifierByNode = (node: Identifier): ts.Identifier | null =>
+      identifiers.find(
+        identifier => getIdentifierName(identifier) === node.name,
+      );
+
+    const diagnostics: SvelteDiagnostic[] = [];
+
+    // log(node);
+
+    // Attribute identifier does not exist
+    // This is the value we have to check if exist on the component
+    if (isIdentifier(node)) {
+      // FIX: Needs to find an actual declaration
+      const identifier = getIdentifierByNode(node);
+
+      // Identifier does not exist in context
+      if (!identifier) {
+        diagnostics.push(
+          createIdentifierNotFoundDiagnostic(identifierNames, node, sourceFile),
+        );
+      } else {
+        // Check if identifier is an object
+        // and if identifier contains strict member names
+        const type = this.typeChecker.getTypeAtLocation(identifier);
+        const compType = this.typeChecker.getTypeAtLocation(component);
+
+        if (isSpread(node.parent)) {
+          /**
+           * When attributes are spread, instead show that type is not assignable to component
+           */
+          if (!this.isAssignableToType(type, compType)) {
+            // TODO
+            // log(this.typeChecker.typeToString(type));
+            // log(this.typeChecker.typeToString(compType));
+            /*const properties = type.getProperties().map(property => property.getName());
+            type.getProperties().forEach(property => {
+              property.valueDeclaration
+            });*/
+            /*properties.forEach(property => {
+              diagnostics.push(
+                createAttributeNonExistentDiagnostic(
+                  memberNames,
+                  property.,
+                  component,
+                  sourceFile,
+                ),
+              );
+            });*/
+            //log(type.symbol.declarations.reduce((names, { properties }) => [...names, ...properties.map(property => getIdentifierName(property))], []));
+          }
+        } else {
+          const property = compType
+            .getProperties()
+            .find(prop => prop.escapedName === node.name);
+          const propertyType = this.typeChecker.getTypeAtLocation(
+            property.valueDeclaration,
+          );
+
+          log(this.typeChecker.typeToString(type));
+          log(this.typeChecker.typeToString(propertyType));
+
+          if (!this.isAssignableToType(identifier, propertyType)) {
+            diagnostics.push(
+              createComponentTypesNotAssignableDiagnostic(
+                node,
+                type,
+                node as any,
+                component,
+                propertyType,
+                sourceFile,
+                this.typeChecker,
+              ),
+            );
+          }
+        }
+      }
+    }
+
+    if (isAttribute(node)) {
+      // check that attribute exists
+      if (!memberNames.includes(node.name)) {
+        diagnostics.push(
+          createAttributeNonExistentDiagnostic(
+            memberNames,
+            node,
+            component,
+            sourceFile,
+          ),
+        );
+      } else {
+        node.value.forEach(value => {
+          diagnostics.push(
+            ...this.gatherAttributeDiagnostics(
+              memberNames,
+              identifierNames,
+              identifiers,
+              component,
+              sourceFile,
+              value,
+            ),
+          );
+        });
+      }
+      // if attribute name is the same as identifier, suggest using a short hand attribute instead
+      // name={name} can be replaced with the {name} shorthand
+      // we need a way to link to stuff in documentation
+
+      // log(value);
+
+      // Validates that identifier exists
+      // and if it does, then validate against the given type
+      /*if (value.expression && !identifiersHasNode(value.expression)) {
+        diagnostics.push(
+          createIdentifierNotFoundDiagnostic(
+            identifierNames,
+            value.expression,
+            sourceFile,
+          ),
+        );
+      } else {
+      }*/
+    }
+
+    // if it's a short hand, check that both the identifier exists, and that the attribute does
+    /*if (isAttributeShortHand(node)) {
+      const identifier = getIdentifierByNode(node.expression);
+
+      // Identifier does not exist in context
+      if (!identifier) {
+        diagnostics.push(
+          createIdentifierNotFoundDiagnostic(
+            identifierNames,
+            node.expression,
+            sourceFile,
+          ),
+        );
+      }
+
+      if (!memberNames.includes(node.expression.name)) {
+        diagnostics.push(
+          createAttributeNonExistentDiagnostic(
+            memberNames,
+            node.expression,
+            component,
+            sourceFile,
+          ),
+        );
+      }
+    }*/
+
+    if (isMustacheTag(node) || isSpread(node) || isAttributeShortHand(node)) {
+      node.expression.parent = node;
+
+      diagnostics.push(
+        ...this.gatherAttributeDiagnostics(
+          memberNames,
+          identifierNames,
+          identifiers,
+          component,
+          sourceFile,
+          node.expression,
+        ),
+      );
+    }
+
+    return diagnostics;
+  }
+
+  // Gathers diagnostics for attributes on Svelte components
   private gatherInlineComponentAttributeDiagnostics(
     scriptFile: ts.SourceFile,
     sourceFile: ts.SourceFile,
     component: ts.ClassDeclaration,
-    { attributes }: InlineComponent,
+    inlineComponent: any,
   ): SvelteDiagnostic[] {
+    // FIX: Needs to be declarations
     const identifiers = collectDeepNodes<ts.Identifier>(
       scriptFile,
-      ts.SyntaxKind.Identifier,
+      ts.SyntaxKind.VariableDeclaration,
     );
 
-    const identifiersHasNode = (node: Node): boolean =>
-      identifiers.some(({ escapedText }) => escapedText === node.name);
+    const memberNames = component.members.map(member =>
+      getIdentifierName(member),
+    );
+    const identifierNames = identifiers.map(identifier =>
+      getIdentifierName(identifier),
+    );
 
-    const memberNames = component.members.map(member => {
-      return (member.name as ts.Identifier).escapedText.toString();
-    });
+    // this should be recursive
+    return inlineComponent.attributes.reduce(
+      (diagnostics, node) => {
+        node.parent = inlineComponent;
 
-    return attributes.reduce(
-      (diagnostics, attr) => {
-        // Attribute identifier does not exist
-        // This is the value we have to check if exist on the component
-        if (!memberNames.includes(attr.name)) {
-          const { bestMatch } = findBestMatch(
-            attr.name.toLowerCase(),
+        return [
+          ...diagnostics,
+          ...this.gatherAttributeDiagnostics(
             memberNames,
-          );
-          const messages = [
-            `Attribute '${attr.name}' doesn't exist on '${component.name.escapedText}'.`,
-          ];
-
-          if (bestMatch.rating >= 0.4) {
-            messages.push(`Did you mean '${bestMatch.target}' instead?`);
-          }
-
-          diagnostics.push({
-            category: ts.DiagnosticCategory.Error,
-            start: attr.start,
-            length: attr.name.length,
-            file: sourceFile,
-            code: attr.type,
-            messageText: formatDiagnosticMessageTexts(messages),
-          });
-        }
-
-        // @ts-ignore
-        attr.value.forEach(value => {
-          if (value.type === 'Text') return;
-
-          // Validates that identifier exists
-          // and if it does, then validate against the given type
-          if (value.expression && !identifiersHasNode(value.expression)) {
-            diagnostics.push({
-              category: ts.DiagnosticCategory.Error,
-              start: value.expression.start,
-              length: value.expression.end - value.expression.start,
-              messageText: `Identifier '${value.expression.name}' cannot be found`,
-              file: sourceFile,
-              code: value.expression.type,
-            });
-          } else {
-          }
-        });
-
-        return diagnostics;
+            identifierNames,
+            identifiers,
+            component,
+            sourceFile,
+            node,
+          ),
+        ];
       },
       [] as SvelteDiagnostic[],
     );
@@ -112,9 +280,7 @@ export class SvelteTypeChecker {
     const getComponentNode = (
       node: ts.ImportClause | ts.ImportSpecifier,
     ): InlineComponent =>
-      componentNodes.find(
-        ({ name }) => name === getTextFromNamedDeclaration(node),
-      );
+      componentNodes.find(({ name }) => name === getIdentifierName(node));
 
     const removeComponentNode = (
       componentNode: InlineComponent,
@@ -246,6 +412,37 @@ export class SvelteTypeChecker {
     return ts.createSourceFile(fileName, source, this.compilerOpts.target);
   }
 
+  private gatherNodeDiagnostics(
+    sourceFile: ts.SourceFile,
+    compiledSvelteFile: ts.SourceFile,
+    node: Node,
+  ): SvelteDiagnostic[] {
+    const diagnostics: SvelteDiagnostic[] = [];
+
+    if (isInlineComponent(node)) {
+      diagnostics.push(
+        ...this.gatherInlineComponentDiagnostics(
+          sourceFile,
+          compiledSvelteFile,
+          node,
+        ),
+      );
+    }
+
+    if (node.children) {
+      node.children.forEach(child => {
+        // HINT: Children will have node as parent, so referencing it for checking object property access will be fine
+        child.parent = node;
+
+        diagnostics.push(
+          ...this.gatherNodeDiagnostics(sourceFile, compiledSvelteFile, child),
+        );
+      });
+    }
+
+    return diagnostics;
+  }
+
   gatherAllDiagnostics(sourceFile: ts.SourceFile): ts.Diagnostic[] {
     const [compiledSource, compilation] = this.compilationCache.get(
       sourceFile.fileName,
@@ -260,21 +457,15 @@ export class SvelteTypeChecker {
 
     if (compilation) {
       // HINT: There'll always be a top level fragment node
-      const fragment = addParentNodeReferences(compilation.ast.html);
+      //const fragment = addParentNodeReferences(compilation.ast.html);
 
       diagnostics.push(
-        ...this.gatherInlineComponentDiagnostics(
+        ...this.gatherNodeDiagnostics(
           sourceFile,
           compiledSvelteFile,
-          fragment,
+          compilation.ast.html,
         ),
       );
-
-      fragment.children.forEach(child => {
-        //log(child);
-        if (isMustacheTag(child)) {
-        }
-      });
     }
 
     return <ts.Diagnostic[]>(<unknown>diagnostics);

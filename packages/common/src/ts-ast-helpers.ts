@@ -1,4 +1,5 @@
 import * as ts from 'typescript';
+import { log } from '@bazel/typescript';
 
 export function collectDeepNodes<T extends ts.Node>(
   node: ts.Node,
@@ -42,6 +43,16 @@ export function findClassDeclaration(
   ) as ts.ClassDeclaration;
 }
 
-export function getTextFromNamedDeclaration(node: ts.NamedDeclaration): string {
-  return (node.name as ts.Identifier).escapedText as string;
+export function getIdentifierName(node: any): string | null {
+  if (typeof node.escapedText === 'string') {
+    return node.escapedText as string;
+  } else if (node.name && typeof node.name.escapedText === 'string') {
+    return node.name.escapedText as string;
+  }
+
+  return null;
 }
+
+/*export function getTypeSymbolDeclarationPropertyNames(type: ts.Type): string[] {
+  return type.symbol.declarations.reduce((names, { properties }) => [...names, ...properties.map(property => getIdentifierName(property))], []);
+}*/
