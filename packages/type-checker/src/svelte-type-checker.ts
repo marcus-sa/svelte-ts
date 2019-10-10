@@ -6,7 +6,7 @@ import * as svelte from '@svelte-ts/common';
 import {
   createNonExistentPropertyDiagnostic,
   createComponentTypesNotAssignableDiagnostic,
-  createIdentifierNotFoundDiagnostic,
+  createDeclarationNotFoundDiagnostic,
 } from './diagnostics';
 
 export class SvelteTypeChecker {
@@ -57,7 +57,7 @@ export class SvelteTypeChecker {
       // Identifier does not exist in context
       if (!declaration) {
         diagnostics.push(
-          createIdentifierNotFoundDiagnostic(
+          createDeclarationNotFoundDiagnostic(
             declarationNames,
             node,
             compiledSourceFile,
@@ -101,7 +101,6 @@ export class SvelteTypeChecker {
             property.valueDeclaration,
           );
 
-          log(this.typeChecker.typeToString(type));
           if (!this.isAssignableToType(propertyType, declarationType)) {
             diagnostics.push(
               createComponentTypesNotAssignableDiagnostic(
@@ -154,7 +153,7 @@ export class SvelteTypeChecker {
       // and if it does, then validate against the given type
       /*if (value.expression && !identifiersHasNode(value.expression)) {
         diagnostics.push(
-          createIdentifierNotFoundDiagnostic(
+          createDeclarationNotFoundDiagnostic(
             identifierNames,
             value.expression,
             sourceFile,
@@ -171,7 +170,7 @@ export class SvelteTypeChecker {
       // Identifier does not exist in context
       if (!identifier) {
         diagnostics.push(
-          createIdentifierNotFoundDiagnostic(
+          createDeclarationNotFoundDiagnostic(
             identifierNames,
             node.expression,
             sourceFile,
@@ -433,30 +432,28 @@ export class SvelteTypeChecker {
   }
 
   gatherAllDiagnostics(scriptSourceFile: ts.SourceFile): ts.Diagnostic[] {
+    if (!this.compilationCache.has(scriptSourceFile.fileName)) {
+      throw new Error(
+        `Script source file ${scriptSourceFile.fileName} doesn't exist in CompilationCache`,
+      );
+    }
+
     const [compiledSource, compilation] = this.compilationCache.get(
       scriptSourceFile.fileName,
     );
 
-    const compiledSvelteFile = this.getCompiledSourceFile(
+    const compiledSourceFile = this.getCompiledSourceFile(
       scriptSourceFile,
       compiledSource,
     );
 
-    const diagnostics: svelte.Diagnostic[] = [];
-
-    if (compilation) {
-      // HINT: There'll always be a top level fragment node
-      //const fragment = addParentNodeReferences(compilation.ast.html);
-
-      diagnostics.push(
-        ...this.gatherNodeDiagnostics(
-          scriptSourceFile,
-          compiledSvelteFile,
-          compilation.ast.html,
-        ),
-      );
-    }
-
-    return <ts.Diagnostic[]>(<unknown>diagnostics);
+    // HINT: There'll always be a top level fragment node
+    return <any[]>(
+      this.gatherNodeDiagnostics(
+        scriptSourceFile,
+        compiledSourceFile,
+        compilation.ast.html,
+      )
+    );
   }
 }
