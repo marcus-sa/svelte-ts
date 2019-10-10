@@ -34,7 +34,7 @@ export class SvelteTypeChecker {
     declarationNames: string[],
     declarations: ts.NamedDeclaration[],
     component: ts.ClassDeclaration,
-    sourceFile: ts.SourceFile,
+    compiledSourceFile: ts.SourceFile,
     node: svelte.Node,
   ): svelte.Diagnostic[] {
     const getDeclarationByNode = (
@@ -58,7 +58,7 @@ export class SvelteTypeChecker {
           createIdentifierNotFoundDiagnostic(
             declarationNames,
             node,
-            sourceFile,
+            compiledSourceFile,
           ),
         );
       } else {
@@ -110,7 +110,7 @@ export class SvelteTypeChecker {
                 node as any,
                 component,
                 propertyType,
-                sourceFile,
+                compiledSourceFile,
                 this.typeChecker,
               ),
             );
@@ -127,7 +127,7 @@ export class SvelteTypeChecker {
             memberNames,
             node,
             component,
-            sourceFile,
+            compiledSourceFile,
           ),
         );
       } else {
@@ -138,7 +138,7 @@ export class SvelteTypeChecker {
               declarationNames,
               declarations,
               component,
-              sourceFile,
+              compiledSourceFile,
               value,
             ),
           );
@@ -204,7 +204,7 @@ export class SvelteTypeChecker {
           declarationNames,
           declarations,
           component,
-          sourceFile,
+          compiledSourceFile,
           node.expression,
         ),
       );
@@ -215,14 +215,14 @@ export class SvelteTypeChecker {
 
   // Gathers diagnostics for attributes on Svelte components
   private gatherComponentPropertyDiagnostics(
-    scriptFile: ts.SourceFile,
-    sourceFile: ts.SourceFile,
+    scriptSourceFile: ts.SourceFile,
+    compiledSourceFile: ts.SourceFile,
     componentDeclaration: ts.ClassDeclaration,
     component: svelte.InlineComponent,
   ): svelte.Diagnostic[] {
     // FIX: Needs to be declarations
     const declarations = svelte.collectDeepNodes<ts.VariableDeclaration>(
-      scriptFile,
+      scriptSourceFile,
       ts.SyntaxKind.VariableDeclaration,
     );
 
@@ -247,7 +247,7 @@ export class SvelteTypeChecker {
             declarationNames,
             declarations,
             componentDeclaration,
-            sourceFile,
+            compiledSourceFile,
             node,
           ),
         ];
@@ -257,8 +257,8 @@ export class SvelteTypeChecker {
   }
 
   private gatherComponentDiagnostics(
-    sourceFile: ts.SourceFile,
-    compiledSvelteFile: ts.SourceFile,
+    scriptSourceFile: ts.SourceFile,
+    compiledSourceFile: ts.SourceFile,
     node: svelte.Node,
   ): svelte.Diagnostic[] {
     const componentNodes = svelte.getComponents(node);
@@ -277,7 +277,7 @@ export class SvelteTypeChecker {
       componentNodes.splice(componentNodes.indexOf(componentNode), 1);
 
     if (componentNodes.length) {
-      const allImports = svelte.getAllImports(sourceFile);
+      const allImports = svelte.getAllImports(scriptSourceFile);
       const componentImports = new Map<
         svelte.InlineComponent,
         ts.ImportClause | ts.ImportSpecifier
@@ -315,7 +315,7 @@ export class SvelteTypeChecker {
         ]);
 
         diagnostics.push({
-          file: compiledSvelteFile,
+          file: compiledSourceFile,
           category: ts.DiagnosticCategory.Error,
           start: component.start,
           length: component.end - component.start,
@@ -337,8 +337,8 @@ export class SvelteTypeChecker {
           // @ts-ignore
           diagnostics.push(
             ...this.gatherComponentPropertyDiagnostics(
-              sourceFile,
-              compiledSvelteFile,
+              scriptSourceFile,
+              compiledSourceFile,
               componentDeclaration,
               componentNode,
             ),
@@ -434,13 +434,13 @@ export class SvelteTypeChecker {
     return diagnostics;
   }
 
-  gatherAllDiagnostics(sourceFile: ts.SourceFile): ts.Diagnostic[] {
+  gatherAllDiagnostics(scriptSourceFile: ts.SourceFile): ts.Diagnostic[] {
     const [compiledSource, compilation] = this.compilationCache.get(
-      sourceFile.fileName,
+      scriptSourceFile.fileName,
     );
 
     const compiledSvelteFile = this.getCompiledSourceFile(
-      sourceFile,
+      scriptSourceFile,
       compiledSource,
     );
 
@@ -452,7 +452,7 @@ export class SvelteTypeChecker {
 
       diagnostics.push(
         ...this.gatherNodeDiagnostics(
-          sourceFile,
+          scriptSourceFile,
           compiledSvelteFile,
           compilation.ast.html,
         ),

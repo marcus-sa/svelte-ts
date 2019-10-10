@@ -34,7 +34,7 @@ export function createComponentTypesNotAssignableDiagnostic(
   property: svelte.Attribute,
   component: ts.ClassDeclaration,
   typeB: ts.Type,
-  sourceFile: ts.SourceFile,
+  compiledSourceFile: ts.SourceFile,
   typeChecker: ts.TypeChecker,
 ): svelte.Diagnostic {
   const name = svelte.isAttributeShortHand(identifier.parent)
@@ -55,7 +55,7 @@ export function createComponentTypesNotAssignableDiagnostic(
     category: ts.DiagnosticCategory.Error,
     start: identifier.start,
     length: identifier.name.length,
-    file: sourceFile,
+    file: compiledSourceFile,
     code: identifier.type,
     messageText: svelte.formatDiagnosticMessageTexts(messages),
   };
