@@ -4,7 +4,9 @@
 		"moduleResolution": "node",
 		"module": "commonjs",
 		"target": "es2017",
-		"lib": [
+    "skipDefaultLibCheck": true,
+    "skipLibCheck": true,
+    "lib": [
       "esnext",
       "dom"
     ],

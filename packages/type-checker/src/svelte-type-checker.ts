@@ -11,9 +11,10 @@ import {
 
 export class SvelteTypeChecker {
   constructor(
-    private readonly bazelHost: CompilerHost,
+    private readonly tsHost: ts.CompilerHost,
     private readonly typeChecker: ts.TypeChecker,
-    private readonly bazelBin: string,
+    private readonly rootDir: string,
+    private readonly files: string[],
     private readonly compilerOpts: ts.CompilerOptions,
     private readonly compilationCache: svelte.CompilationCache,
   ) {}
@@ -389,11 +390,11 @@ export class SvelteTypeChecker {
   ): ts.SourceFile {
     const fileName = svelte.getInputFileFromOutputFile(
       sourceFile.fileName,
-      this.bazelBin,
-      this.bazelHost.inputFiles,
+      this.rootDir,
+      this.files,
     );
 
-    const source = this.bazelHost
+    const source = this.tsHost
       .readFile(fileName)
       .replace(svelte.SCRIPT_TAG, `<script>${compiledSource}</script>`);
 
