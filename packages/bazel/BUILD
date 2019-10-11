@@ -6,10 +6,10 @@ package(default_visibility = ["//visibility:public"])
 ts_library(
     name = "compiler_lib",
     srcs = glob(["**/*.ts"]),
-    module_name = "@svelte-ts/compiler",
-    visibility = ["//visibility:public"],
+    module_name = "@svelte-ts/bazel",
     deps = [
         "//packages/common",
+        "//packages/compiler",
         "//packages/type-checker",
         "@npm//@bazel/typescript",
         "@npm//@types",
@@ -25,13 +25,6 @@ nodejs_binary(
     configuration_env_vars = ["compile"],
     data = [":compiler_lib"],
     entry_point = ":internal/main.ts",
-    visibility = ["//visibility:public"],
-)
-
-filegroup(
-    name = "package_assets",
-    srcs = ["BUILD.bazel"],
-    visibility = ["//src:__subpackages__"],
 )
 
 # For generating skydoc
