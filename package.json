@@ -45,7 +45,7 @@
     "lint-staged": "9.4.1",
     "memfs": "^2.15.5",
     "prettier": "1.18.2",
-    "sapper": "0.27.9",
+    "sapper": "0.27.11",
     "string-similarity": "3.0.0",
     "svelte": "3.12.1",
     "ts-simple-type": "^0.3.6",
